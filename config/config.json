@@ -1,0 +1,35 @@
+{
+    "logger": {
+	"zippedArchive": false,
+	"dateFormat": "YYYY-MM-DD HH:mm:ss,SSS",
+	"maxSize": "50m",
+	"severity": "info",
+	"logname": "dafne-be--%DATE%.log",
+	"datePattern": "YYYY-MM-DD"
+    },
+    "production": {
+    	"username": "dafne",
+    	"password": "<PWD>",
+    	"database": "dafne",
+    	"host": "localhost",
+    	"port": "5432",
+    	"dialect": "postgres",
+    	"operatorsAliases": false
+    },
+	"crypto": {
+		"symmetric": {
+			"secret": "",
+			"algorithm": ""
+		}
+	},
+	"auth": {
+		"keycloakBaseUrl": "https://<keycloak_url>/auth/realms/dhus/protocol/openid-connect",
+		"clientId": "dafne",
+		"grantType": "password"
+
+	},
+	"requestTimeout": 30000,
+	"dataSourceStatus": ["RUNNING", "PENDING"],
+	"version": "1.0.4",
+        "port": 2000
+}
