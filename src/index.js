@@ -2,12 +2,12 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const sequelize = require('./app/util/database'); //database initializations
 const wlogger = require('./app/util/wlogger');
+const scheduleAvailability = require('./app/services/availability');
 
 //INITIALIZE APP WITH EXPRESS
 const app = express();
 const dbParams = require('./app/util/config').getDatabaseConfig();
 const config = require('./app/util/config');
-
 
 //BODYPARSER
 app.use(bodyParser.json());
@@ -39,12 +39,16 @@ app.use('/products', require('./app/routes/products'));
       await sequelize.sync({ force: false }); // force: true recreate db every time
       app.listen(config.getConfig().port);
       wlogger.info('Server READY');
+      scheduleAvailability.createScheduler();
+      setInterval(function() {
+        scheduleAvailability.checkAndUpdateScheduler();
+      }, 60000);  //TODO: replace with cfg param. AT present check for new availability schedule every minute
       
     } else {
       wlogger.error('dbParams.username' + dbParams.username);
     }
   } catch (error) {
-    // wlogger.error(error)
+     wlogger.error(error)
   }
 })();
 

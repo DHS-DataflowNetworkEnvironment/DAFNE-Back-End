@@ -3,6 +3,7 @@ const axios = require('axios');
 const Centre = require("../models/centre");
 const Service = require("../models/service");
 const Sequelize = require('sequelize');
+const moment = require('moment');
 const sequelize = require('../util/database');
 const urljoin = require('url-join');
 const Utilcrypto = require('../util/Utilcrypto');
@@ -585,6 +586,83 @@ getFakeDataSourcesInfo = () => {
 		return res.status(200).json(centres);
 	} catch (error) {
 		wlogger.error({ "ERROR getMapDhsConnected: ": error });
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//Compute service availability related to provided date filters for the proveded FE or Single Instance centre
+// For all authenticated users
+/* Request body example:
+ * {
+ 	"startDate":"2021-11-05",
+	"stopDate":"2021-11-06"
+ * }
+   Response example
+   {
+	"centreId": "1",
+	"values": [{
+			"date": "2022-02-27",
+			"successResponses": 128,
+			"totalRequests": 144,
+			"percentage": 88.88888888888889
+		},
+		{
+			"date": "2022-02-27",
+			"successResponses": 144,
+			"totalRequests": 144,
+			"percentage": 100
+		},
+		{
+			"date": "2022-03-01",
+			"successResponses": 138,
+			"totalRequests": 138,
+			"percentage": 100
+		},
+		{
+			"date": "2022-03-02",
+			"successResponses": 1,
+			"totalRequests": 1,
+			"percentage": 100
+		}]
+	}
+*/
+exports.computeAvailability = async (req, res, next) => {
+	let availability = {};
+	let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY day) x ORDER BY day";
+	wlogger.debug("computeAvailability: [GET] /centres/:id/service/availability");
+	try {
+		if (isNaN(req.params.id)) {
+			return res.status(400).json("Centre must be a number");
+		}
+		availability.centreId = req.params.id;
+		wlogger.debug("request body");
+		wlogger.debug(req.body);
+		if (!req.body.startDate || !req.body.stopDate) {
+			return res.status(400).json("Not valid Date range");
+		}		
+		if (!moment(req.body.startDate, "YYYY-MM-DD", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DD", true).isValid()) {
+			return res.status(400).json("Invalid Date Format")
+		}
+		if(req.body.startDate > req.body.stopDate) {
+			return res.status(400).json("startDate must be greater or equal than stopDate");
+		}
+		
+		wlogger.debug("Compute availability between " + req.body.startDate + " and " + req.body.stopDate);
+		
+		// Add query to retrieve availability results
+		const itemList = await sequelize.query(
+			query,
+			{
+				replacements: [req.body.startDate, req.body.stopDate, req.params.id],
+				type: Sequelize.QueryTypes.SELECT
+			}
+		);
+		availability.values = itemList;
+		wlogger.debug("Averall Service Availability:");
+		wlogger.debug(availability)
+		return res.status(200).json(availability);
+	} catch (error) {
 		wlogger.error(error);
 		return res.status(500).json(error);
 	}
