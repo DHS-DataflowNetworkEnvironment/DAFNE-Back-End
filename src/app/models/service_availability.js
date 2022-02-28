@@ -10,19 +10,11 @@ const ServiceAvailability = db.define('service_availability', {
       },
       service_url: {
         type: Sequelize.STRING,
-        allowNull: false,
-        references: {
-          model: 'services',
-          key: 'service_url'
-        }
+        allowNull: false
       },
       centre_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        references: {
-          model: 'centres',
-          key: 'id'
-        }
+        allowNull: false
       },
       timestamp: {
         type: Sequelize.DATE,
@@ -66,20 +58,7 @@ const ServiceAvailability = db.define('service_availability', {
 	}]
 });
   
-ServiceAvailability.associate = function(models) {
-    ServiceAvailability.belongsTo(models.Service, {
-        foreignKey: 'service_url',
-        as: 'service_url'
-    });
 
-};
-ServiceAvailability.associate = function(models) {
-    ServiceAvailability.belongsTo(models.Centre, {
-        foreignKey: 'centre_id',
-        as: 'centre_id'
-    });
-  
-};
 ServiceAvailability.schema("public");
 
 module.exports = ServiceAvailability;

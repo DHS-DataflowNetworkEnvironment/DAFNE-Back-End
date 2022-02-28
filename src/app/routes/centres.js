@@ -35,3 +35,7 @@ module.exports = router;
 //[POST] ../centres/id/service/availability
 router.post('/:id/service/availability', isAuth, controller.computeAvailability);
 module.exports = router;
+
+//[POST] ../centres/id/service/availability/average
+router.post('/:id/service/availability/average', isAuth, controller.computeAverageAvailability);
+module.exports = router;

@@ -78,7 +78,7 @@ checkServiceAVailability = async () => {
                         }
                         wlogger.error("Received error response from Service while checking availability " + service.service_url); 
                         wlogger.error(err);
-                        console.log(err.toJSON());
+                        //console.log(err.toJSON());
                     } else if (err.request) {
                         try {
                             description = (err.toJSON()).message;
@@ -88,7 +88,7 @@ checkServiceAVailability = async () => {
                         // client never received a response, or request never left
                         wlogger.error("No response received from Service while checking availability " + service.service_url); 
                         wlogger.error(err);
-                        console.log(err.toJSON());                       
+                        //console.log(err.toJSON());                       
                     } else {
                         try {
                             description = (err.toJSON()).message;
@@ -98,7 +98,7 @@ checkServiceAVailability = async () => {
                         // anything else
                         wlogger.error("Error from Service while checking availability " + service.service_url); 
                         wlogger.error(err);
-                        console.log(err.toJSON());
+                        //console.log(err.toJSON());
                     }
                 });
                 let stopDate = new Date().getTime();

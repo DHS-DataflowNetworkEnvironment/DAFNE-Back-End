@@ -10,19 +10,11 @@ module.exports = {
       },
       service_url: {
         type: Sequelize.STRING,
-        allowNull: false,
-        references: {
-          model: 'services',
-          key: 'service_url'
-        }
+        allowNull: false
       },
       centre_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        references: {
-          model: 'centres',
-          key: 'id'
-        }
+        allowNull: false
       },
       timestamp: {
         type: Sequelize.DATE,
