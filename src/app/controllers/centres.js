@@ -634,8 +634,8 @@ getFakeDataSourcesInfo = () => {
 exports.computeAvailability = async (req, res, next) => {
 	let availability = {};
 	//let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY day) x ORDER BY day";
-	let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT avg(count/total::float)*100 FROM (SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day) z ) average FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=2 GROUP BY day ) x ORDER BY day";
-	wlogger.debug("computeAvailability: [GET] /centres/:id/service/availability");
+	let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT avg(count/total::float)*100 FROM (SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day) z ) average FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day ) x ORDER BY day";
+	wlogger.info("computeAvailability: [GET] /centres/:id/service/availability");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
@@ -646,14 +646,14 @@ exports.computeAvailability = async (req, res, next) => {
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
-		if (!moment(req.body.startDate, "YYYY-MM-DD", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DD", true).isValid()) {
+		if (!moment(req.body.startDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() ) {
 			return res.status(400).json("Invalid Date Format")
 		}
 		if(req.body.startDate > req.body.stopDate) {
 			return res.status(400).json("startDate must be greater or equal than stopDate");
 		}
 		
-		wlogger.debug("Compute availability between " + req.body.startDate + " and " + req.body.stopDate);
+		wlogger.info("Compute availability between " + req.body.startDate + " and " + req.body.stopDate);
 		
 		// Add query to retrieve availability results
 		const itemList = await sequelize.query(
@@ -692,7 +692,7 @@ exports.computeAvailability = async (req, res, next) => {
 exports.computeAverageAvailability = async (req, res, next) => {
 	let availability = {};
 	let query = "SELECT AVG(percentage) as average FROM(SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as day, count, total, (count/total::float)*100 percentage FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? AND centre_id=? GROUP BY day) x ORDER BY day) y";
-	wlogger.debug("computeAverageAvailability: [GET] /centres/:id/service/availability/average");
+	wlogger.info("computeAverageAvailability: [GET] /centres/:id/service/availability/average");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
@@ -703,14 +703,14 @@ exports.computeAverageAvailability = async (req, res, next) => {
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
-		if (!moment(req.body.startDate, "YYYY-MM-DD", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DD", true).isValid()) {
+		if (!moment(req.body.startDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() ) {
 			return res.status(400).json("Invalid Date Format")
 		}
 		if(req.body.startDate > req.body.stopDate) {
 			return res.status(400).json("startDate must be greater or equal than stopDate");
 		}
 		
-		wlogger.debug("Compute availability between " + req.body.startDate + " and " + req.body.stopDate);
+		wlogger.info("Compute average availability between " + req.body.startDate + " and " + req.body.stopDate);
 		
 		// Add query to retrieve availability results
 		const itemList = await sequelize.query(
