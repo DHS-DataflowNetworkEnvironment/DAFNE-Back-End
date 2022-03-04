@@ -6,15 +6,20 @@ const ServiceAVailability = require("../models/service_availability");
 const Sequelize = require('sequelize');
 const urljoin = require('url-join');
 const Utilcrypto = require('../util/Utilcrypto');
-const util = require('../util/utility');
 const wlogger = require('../util/wlogger');
 const conf = require('../util/config');
-
 const  cron = require('node-cron');
 
-
 let job;
-let schedule = "* */1 * * *";
+let purgeJob;
+// default check availability schedule 10 minutes
+let schedule = "*/10 * * * *";
+// default purge availability table, evry day at 01:00 AM
+let purgeSchedule = "0 1 * * *";
+// default availability rolling period 90 days
+let rollingPeriodInDays = 90;
+let enablePurge = true;
+
 let availability_endpoint = "odata/v1/Products?$top=1";
 
 checkServiceAVailability = async () => {
@@ -140,6 +145,32 @@ checkServiceAVailability = async () => {
     return status;
 };
 
+purgeServiceAvailability = async() => {
+    try {
+
+        if(conf.getConfig().availability && conf.getConfig().availability.rollingPeriodInDays ) {
+            if (isNaN(conf.getConfig().availability.rollingPeriodInDays)) {
+                wlogger.warn(`The parameter availability.rollingPeriodInDay must be a number. Found value: ${conf.getConfig().availability.rollingPeriodInDays}`);
+                wlogger.warn(`Using default: ${rollingPeriodInDays}`);
+            } else {
+                rollingPeriodInDays = conf.getConfig().availability.rollingPeriodInDays;
+            }
+        }
+        var rollingDate = new Date();
+        rollingDate.setDate(rollingDate.getDate()-rollingPeriodInDays);
+        wlogger.info(`Start purging service availability data older than ${rollingPeriodInDays}. Check date is ${rollingDate}`);
+        const purgedRows = await ServiceAVailability.destroy({
+            where: { timestamp: {[Sequelize.Op.lt]: rollingDate} } 
+
+        });
+        wlogger.info(`Successfully purged ${purgedRows} rows in service availability`);
+    } catch (error) {
+        wlogger.error("Errors occurred while purging service availability");
+        wlogger.error(error);
+    }
+    //where: { createdAt: {[Op.lt]: d,[Op.gte]: dy}}
+}
+
 
 exports.createScheduler = () => {
  
@@ -185,5 +216,33 @@ exports.checkAndUpdateScheduler = () => {
         wlogger.error("Error occurred while updating scheduler for service availability")
         wlogger.error(error);
     }
+};
+
+exports.createPurgeScheduler = () => {
+ 
+    try {
+
+        if(conf.getConfig().availability && conf.getConfig().availability.hasOwnProperty('enablePurge')) {
+            enablePurge = conf.getConfig().availability.enablePurge;
+        }
+        if(enablePurge) {
+       
+            if(conf.getConfig().availability && conf.getConfig().availability.purgeSchedule && conf.getConfig().availability.purgeSchedule !== '') {
+                purgeSchedule = conf.getConfig().availability.purgeSchedule;
+                wlogger.info("Use configuration file purgeSchedule: " + purgeSchedule);
+            } else {
+                wlogger.info("No purgeSchedule defined in configuration file for service availability. Using default purgeSchedule: " + purgeSchedule);
+            }
+            purgeJob = cron.schedule(purgeSchedule, async() => {
+                wlogger.info("Start purging service availability...");
+                await purgeServiceAvailability();           
+            })
+        } else {
+            wlogger.info("Service availability purge is disabled. Please check your parameters if you want to enable it.");
+        }
+    } catch(error) {
+        wlogger.error("Error occurred while creating purgeSchedule for service availability")
+		wlogger.error(error);
+	}
 };
 

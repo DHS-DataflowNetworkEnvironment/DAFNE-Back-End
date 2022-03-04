@@ -40,6 +40,7 @@ app.use('/products', require('./app/routes/products'));
       app.listen(config.getConfig().port);
       wlogger.info('Server READY');
       scheduleAvailability.createScheduler();
+      scheduleAvailability.createPurgeScheduler();
       setInterval(function() {
         scheduleAvailability.checkAndUpdateScheduler();
       }, 60000);  //TODO: replace with cfg param. AT present check for new availability schedule every minute
