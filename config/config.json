@@ -28,8 +28,16 @@
 		"grantType": "password"
 
 	},
+	"availability": {
+		"schedule": "*/10 * * * *",
+		"enablePurge": true,
+		"purgeSchedule": "0 1 * * *",
+		"rollingPeriodInDays": 90,
+		"url": "odata/v1/Products?$top=1"
+	},
 	"requestTimeout": 30000,
 	"dataSourceStatus": ["RUNNING", "PENDING"],
-	"version": "1.0.4",
-        "port": 2000
+	"version": "1.1.0",
+        "port": 2000,
+	"adminRole": "DATAFLOW_MANAGER"
 }
