@@ -1,7 +1,7 @@
 version: "3.1"
 services:
   be:
-    image: "aliaspace/dafne:be-1.0.0"
+    image: "aliaspace/dafne:be-1.1.0"
     container_name: be
     hostname: backend
     restart: always
