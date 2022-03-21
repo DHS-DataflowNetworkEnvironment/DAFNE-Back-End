@@ -59,6 +59,33 @@ exports.parseDataSourceInfo = (data, centre) => {
   return dsInfo;
 };
 
+exports.parseV2DataSourceInfo = (data, refSource, centre) => {
+  var dsInfo = {};
+  try {
+    if (data) {
+
+      let lastCreationDate = 'N/A';
+      if(refSource.LastCreationDate) {
+        lastCreationDate = this.parseJsonDate(refSource.LastCreationDate);
+      } else {
+        lastCreationDate = this.parseJsonDate(data.LastCreationDate);
+      }       
+      let filter = (data.FilterParam) ? this.parseODataFilter(data.FilterParam) : "All product types ";
+      let rawFilter = (data.FilterParam) ? data.FilterParam : "All product types";
+      dsInfo.info = filter;
+      dsInfo.filter = rawFilter + " ";
+      dsInfo.lastCreationDate = lastCreationDate;
+      if(centre) {
+        dsInfo.centre =  centre;
+      }
+    }
+  } catch (error) {
+		wlogger.error('Error parsing DataSource Info');
+		wlogger.error(error);
+	}
+  return dsInfo;
+};
+
 
 exports.capitalizeFirstLetter = string => {
   return string.toLowerCase().charAt(0).toUpperCase() + string.toLowerCase().slice(1);
