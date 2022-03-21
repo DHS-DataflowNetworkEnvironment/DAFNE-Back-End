@@ -1,5 +1,8 @@
 const wlogger = require('../util/wlogger');
 const conf = require('../util/config');
+const axios = require('axios');
+const urljoin = require('url-join');
+const Utilcrypto = require('../util/Utilcrypto');
 
 const regex_substring = /^.*substringof\('(.*)',Name\).*/gm;
 const regex_startswith = /^.*startswith\(Name,'(.*)'\).*/gm;
@@ -157,3 +160,43 @@ exports.getDatesList = (start, stop)  => {
   }
   return dates;
 };
+
+
+exports.performDHuSServiceRequest = async (service, requestUrl) => {
+  const source = axios.CancelToken.source();
+  let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
+  timeout = setTimeout(() => {
+    source.cancel();
+    wlogger.error("No response received from Service " + service.service_url); 
+    wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+  }, requestTimeout);
+  const response = await axios({
+    method: 'get',
+    url: urljoin(service.service_url, requestUrl),
+    auth: {
+      username: service.username,
+      password: Utilcrypto.decrypt(service.password)
+    },
+    validateStatus: false,
+    cancelToken: source.token
+  }).catch(err => {
+    if (err.response) {
+    // client received an error response (5xx, 4xx)
+    wlogger.error("Received error response from Service " + service.service_url); 
+    wlogger.error(err);
+    } else if (err.request) {
+    // client never received a response, or request never left
+    wlogger.error("No response received from Service " + service.service_url); 
+    wlogger.error(err);
+    } else {
+    // anything else
+    wlogger.error("Error from Service " + service.service_url); 
+    wlogger.error(err);
+    }
+  });
+  // Clear The Timeout
+  clearTimeout(timeout);
+  return response;
+}
+
+

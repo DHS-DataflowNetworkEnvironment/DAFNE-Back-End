@@ -12,9 +12,10 @@ const wlogger = require('../util/wlogger');
 const conf = require('../util/config');
 
 const evictionUrl = 'odata/v2/Evictions';
-const synchUrl = 'odata/v1/Synchronizers'
-const selectSynchUrl = 'odata/v1/Synchronizers?$select=ServiceUrl,Status'
-
+const synchUrl = 'odata/v1/Synchronizers';
+const selectSynchUrl = 'odata/v1/Synchronizers?$select=ServiceUrl,Status';
+const productSourcesUrl = 'odata/v2/ProductSources';
+const intelliSynchUrl = 'odata/v2/Synchronizers?$expand=ReferencedSources&$select=Cron,ReferencedSources';
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -493,60 +494,79 @@ getFakeDataSourcesInfo = () => {
 		let centres = [];
 		let centreServices = [];
 		const services = await Service.findAll();
+		wlogger.debug("services are");
+		wlogger.debug(services);
 		let timeout;
 		// for each service configured for a center, get the list of ds info
 		for (const service of services) {
 			wlogger.debug("service.centre: " + service.centre);
 			wlogger.debug("req.params.id: " + req.params.id);
+			// get the list of service_url intersecting the configured services of a center (excluding the source centre)
 			if(service.centre != req.params.id && service.service_type != 2 ) { //Exclude FE services and local services from the list 
-				const source = axios.CancelToken.source();
-				let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
-				timeout = setTimeout(() => {
-					source.cancel();
-					wlogger.error("No response received from Service " + service.service_url); 
-					wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
-				}, requestTimeout);
-				const synch = await axios({
-					method: 'get',
-					url: urljoin(service.service_url, selectSynchUrl),
-					auth: {
-						username: service.username,
-						password: Utilcrypto.decrypt(service.password)
-					},
-					validateStatus: false,
-					cancelToken: source.token
-				}).catch(err => {
-					if (err.response) {
-					// client received an error response (5xx, 4xx)
-					wlogger.error("Received error response from Service " + service.service_url); 
-					wlogger.error(err);
-					} else if (err.request) {
-					// client never received a response, or request never left
-					wlogger.error("No response received from Service " + service.service_url); 
-					wlogger.error(err);
-					} else {
-					// anything else
-					wlogger.error("Error from Service " + service.service_url); 
-					wlogger.error(err);
-					}
-				});
-				// Clear The Timeout
-				clearTimeout(timeout);
-				if(synch && synch.status == 200 && synch.data){
+				
+				// Check if DHuS service support Intelligent Synchronizers by performing request to ProductSources entity
+				const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
+				wlogger.debug("Product Sources HTTP response");
+				console.log(sources);
+				// Get info from odata/v1 synchronizers
+				if (sources && sources.status == 404) {
+					wlogger.info("Service " + service + " does not support Intelligent Synchronizers. Getting legacy synch list...")
+					const synch = await utility.performDHuSServiceRequest(service, selectSynchUrl);
+					if(synch && synch.status == 200 && synch.data){
 
-					wlogger.debug(synch.data.d.results); 
-					const dataSourceStatus = (conf.getConfig().dataSourceStatus) ? conf.getConfig().dataSourceStatus : ["RUNNING", "PENDING"];
-	
-					// get the list of service_url intersecting the configured services of a center (excluding the source centre)
-					for (const element of synch.data.d.results) {
-						if (dataSourceStatus.indexOf(element.Status) >= 0) {
-							// add both serviceUrl ending or not with slash, to facilitate the search on the DB from Synch results
-							dsInfo.push({"centre": service.centre,"synch": element.ServiceUrl.split('/odata')[0]});
+						wlogger.debug(synch.data.d.results); 
+						const dataSourceStatus = (conf.getConfig().dataSourceStatus) ? conf.getConfig().dataSourceStatus : ["RUNNING", "PENDING"];
+		
+						for (const element of synch.data.d.results) {
+							if (dataSourceStatus.indexOf(element.Status) >= 0) {
+								// add both serviceUrl ending or not with slash, to facilitate the search on the DB from Synch results
+								dsInfo.push({"centre": service.centre,"synch": element.ServiceUrl.split('/odata')[0]});
+							}
+						
 						}
-					
+						
 					}
-					
+				} else if (sources && sources.status == 200 && sources.data) {
+					sourceList = sources.data.value;
+					wlogger.info("Service " + service + " is compliant with Intelligent Synchronizers. Getting synch list...")
+					const intelliSynch = await utility.performDHuSServiceRequest(service, intelliSynchUrl);
+					if(intelliSynch && intelliSynch.status == 200 && intelliSynch.data){
+
+						wlogger.debug(intelliSynch.data.value); 
+						// Check if Intelligent Synchronizer is Active from Cron.Active property
+						for (const element of intelliSynch.data.value) {
+							if (element.Cron.Active) {
+								let referencedSources = element.ReferencedSources;
+								wlogger.debug("referencedSources");
+								wlogger.debug(referencedSources);
+								let filteredSources =[];
+								for (rs of referencedSources) {
+									if(typeof sourceList[rs.ReferenceId] !== 'undefined') {
+										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
+										// TODO: check with EGiuliani if odata is present in the Url
+										try {
+											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
+											if(referencedSources.length == 1 ) {
+												dsInfo.push({"centre": service.centre,"synch": sourceList[rs.ReferenceId].Url.split('/odata')[0]});
+
+											} else if (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable) {
+												// if a synch contains more than 1 ReferncedSource, add it to dsInfo only if the Listable attribute is set to true
+												dsInfo.push({"centre": service.centre,"synch": sourceList[rs.ReferenceId].Url.split('/odata')[0]});
+											}
+										} catch (e) {
+											wlogger.error(e)
+										}
+									}
+										
+								}	
+							}
+						
+						}
+					}
+				} else {
+					wlogger.info("Failed to retrieve sources and synch list for service " + service)
 				}
+				
 			} else if (service.centre == req.params.id && service.service_type != 3) {  // get local services (excluding BE services)
 				if (service.service_url.lastIndexOf('/') == service.service_url.length -1) {
 					centreServices.push(service.service_url.slice(0, -1));
