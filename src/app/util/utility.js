@@ -59,14 +59,17 @@ exports.parseDataSourceInfo = (data, centre) => {
   return dsInfo;
 };
 
-exports.parseV2DataSourceInfo = (data, refSource, centre) => {
+exports.parseV2DataSourceInfo = (data, refSource, source, centre) => {
   var dsInfo = {};
   try {
     if (data) {
 
       let lastCreationDate = 'N/A';
+      
       if(refSource.LastCreationDate) {
-        lastCreationDate = this.parseJsonDate(refSource.LastCreationDate);
+        lastCreationDate = refSource.LastCreationDate;
+      } else if (source.LastCreationDate) {
+        lastCreationDate = source.LastCreationDate;
       } else {
         lastCreationDate = this.parseJsonDate(data.LastCreationDate);
       }       

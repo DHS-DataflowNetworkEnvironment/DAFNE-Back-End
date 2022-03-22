@@ -341,7 +341,7 @@ getFakeDataSourcesInfo = () => {
 									// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
 									try {
 										// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-										if(referencedSources.length == 1 ) {
+										if(referencedSources.length == 1 || (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable)) {
 											
 											const synchServiceUrl = sourceList[rs.ReferenceId].Url.split('/odata')[0];
 
@@ -357,28 +357,10 @@ getFakeDataSourcesInfo = () => {
 													});
 												}
 												
-												dsInfo.push(utility.parseV2DataSourceInfo(element, rs, centre))
+												dsInfo.push(utility.parseV2DataSourceInfo(element, rs, sourceList[rs.ReferenceId], centre))
 											}
 
-										} else if (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable) {
-											// if a synch contains more than 1 ReferncedSource, add it to dsInfo only if the Listable attribute is set to true
-											const synchServiceUrl = sourceList[rs.ReferenceId].Url.split('/odata')[0];
-
-											if (serviceUrls.indexOf(synchServiceUrl) >=0 || 
-												serviceUrls.indexOf(synchServiceUrl + '/') >=0) {
-												let centreService = feServices.filter((arr) => arr.service_url.indexOf(synchServiceUrl)>=0);
-												let centre;
-												if (typeof centreService !== 'undefined' && centreService.length > 0) {
-													centre = await Centre.findOne({
-														where: {
-															id: centreService[0].centre
-														}
-													});
-												}
-												
-												dsInfo.push(utility.parseV2DataSourceInfo(element, rs, centre))
-											}
-										}
+										} 
 									} catch (e) {
 										wlogger.error(e)
 									}
@@ -482,17 +464,12 @@ getFakeDataSourcesInfo = () => {
 										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
 										try {
 											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-											if(referencedSources.length == 1 ) {
+											if(referencedSources.length == 1 || (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable)) {
 												const synchServiceUrl = sourceList[rs.ReferenceId].Url.split('/odata')[0];
 												dsInfo.push(synchServiceUrl);
 												dsInfo.push(synchServiceUrl + '/');
 
-											} else if (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable) {
-												// if a synch contains more than 1 ReferncedSource, add it to dsInfo only if the Listable attribute is set to true
-												const synchServiceUrl = sourceList[rs.ReferenceId].Url.split('/odata')[0];
-												dsInfo.push(synchServiceUrl);
-												dsInfo.push(synchServiceUrl + '/');
-											}
+											} 
 										} catch (e) {
 											wlogger.error(e)
 										}
@@ -616,13 +593,10 @@ getFakeDataSourcesInfo = () => {
 										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
 										try {
 											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-											if(referencedSources.length == 1 ) {
+											if(referencedSources.length == 1 || (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable)) {
 												dsInfo.push({"centre": service.centre,"synch": sourceList[rs.ReferenceId].Url.split('/odata')[0]});
 
-											} else if (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable) {
-												// if a synch contains more than 1 ReferncedSource, add it to dsInfo only if the Listable attribute is set to true
-												dsInfo.push({"centre": service.centre,"synch": sourceList[rs.ReferenceId].Url.split('/odata')[0]});
-											}
+											} 
 										} catch (e) {
 											wlogger.error(e)
 										}
