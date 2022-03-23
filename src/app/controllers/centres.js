@@ -283,7 +283,7 @@ getFakeDataSourcesInfo = () => {
 		for (const service of services) {			
 			const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 			wlogger.debug("Product Sources HTTP response");
-			console.log(sources);
+			//console.log(sources);
 			// Get info from odata/v1 synchronizers
 			if (sources && sources.status == 404) {
 				wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
@@ -337,17 +337,22 @@ getFakeDataSourcesInfo = () => {
 							wlogger.debug("referencedSources");
 							wlogger.debug(referencedSources);
 							for (rs of referencedSources) {
-								if(typeof sourceList[rs.ReferenceId] !== 'undefined') {
+								let selectedSource = sourceList.filter((arr) =>rs.ReferenceId==arr.Id);
+								
+								if(selectedSource.length > 0 && typeof selectedSource[0] !== 'undefined') {
 									// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
 									try {
 										// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-										if(referencedSources.length == 1 || (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable)) {
+										
+										if(referencedSources.length == 1 || (referencedSources.length > 1 && selectedSource[0].Listable)) {
 											
-											const synchServiceUrl = sourceList[rs.ReferenceId].Url.split('/odata')[0];
+											
+											const synchServiceUrl = selectedSource[0].Url.split('/odata')[0];
 
 											if (serviceUrls.indexOf(synchServiceUrl) >=0 || 
 												serviceUrls.indexOf(synchServiceUrl + '/') >=0) {
 												let centreService = feServices.filter((arr) => arr.service_url.indexOf(synchServiceUrl)>=0);
+												 
 												let centre;
 												if (typeof centreService !== 'undefined' && centreService.length > 0) {
 													centre = await Centre.findOne({
@@ -357,7 +362,7 @@ getFakeDataSourcesInfo = () => {
 													});
 												}
 												
-												dsInfo.push(utility.parseV2DataSourceInfo(element, rs, sourceList[rs.ReferenceId], centre))
+												dsInfo.push(utility.parseV2DataSourceInfo(element, rs, selectedSource[0], centre))
 											}
 
 										} 
@@ -422,7 +427,7 @@ getFakeDataSourcesInfo = () => {
 			
 			const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 				wlogger.debug("Product Sources HTTP response");
-				console.log(sources);
+				//console.log(sources);
 				// Get info from odata/v1 synchronizers
 				if (sources && sources.status == 404) {
 					wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
@@ -460,12 +465,13 @@ getFakeDataSourcesInfo = () => {
 								wlogger.debug("referencedSources");
 								wlogger.debug(referencedSources);
 								for (rs of referencedSources) {
-									if(typeof sourceList[rs.ReferenceId] !== 'undefined') {
+									let selectedSource = sourceList.filter((arr) =>rs.ReferenceId==arr.Id);
+									if(selectedSource.length > 0 && typeof selectedSource[0] !== 'undefined') {
 										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
 										try {
 											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-											if(referencedSources.length == 1 || (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable)) {
-												const synchServiceUrl = sourceList[rs.ReferenceId].Url.split('/odata')[0];
+											if(referencedSources.length == 1 || (referencedSources.length > 1 && selectedSource[0].Listable)) {
+												const synchServiceUrl = selectedSource[0].Url.split('/odata')[0];
 												dsInfo.push(synchServiceUrl);
 												dsInfo.push(synchServiceUrl + '/');
 
@@ -555,7 +561,7 @@ getFakeDataSourcesInfo = () => {
 				// Check if DHuS service support Intelligent Synchronizers by performing request to ProductSources entity
 				const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 				wlogger.debug("Product Sources HTTP response");
-				console.log(sources);
+				//console.log(sources);
 				// Get info from odata/v1 synchronizers
 				if (sources && sources.status == 404) {
 					wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
@@ -587,14 +593,14 @@ getFakeDataSourcesInfo = () => {
 								let referencedSources = element.ReferencedSources;
 								wlogger.debug("referencedSources");
 								wlogger.debug(referencedSources);
-								let filteredSources =[];
 								for (rs of referencedSources) {
-									if(typeof sourceList[rs.ReferenceId] !== 'undefined') {
+									let selectedSource = sourceList.filter((arr) =>rs.ReferenceId==arr.Id);
+									if(selectedSource.length > 0 && typeof selectedSource[0] !== 'undefined') {
 										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
 										try {
 											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-											if(referencedSources.length == 1 || (referencedSources.length > 1 && sourceList[rs.ReferenceId].Listable)) {
-												dsInfo.push({"centre": service.centre,"synch": sourceList[rs.ReferenceId].Url.split('/odata')[0]});
+											if(referencedSources.length == 1 || (referencedSources.length > 1 && selectedSource[0].Listable)) {
+												dsInfo.push({"centre": service.centre,"synch": selectedSource[0].Url.split('/odata')[0]});
 
 											} 
 										} catch (e) {
