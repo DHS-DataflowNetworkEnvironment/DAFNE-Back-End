@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const sequelize = require('./app/util/database'); //database initializations
 const wlogger = require('./app/util/wlogger');
 const scheduleAvailability = require('./app/services/availability');
+const scheduleLatency = require('./app/services/publication_latency');
 
 //INITIALIZE APP WITH EXPRESS
 const app = express();
@@ -41,9 +42,14 @@ app.use('/products', require('./app/routes/products'));
       wlogger.info('Server READY');
       scheduleAvailability.createScheduler();
       scheduleAvailability.createPurgeScheduler();
+      scheduleLatency.createScheduler();
+      scheduleLatency.createPurgeScheduler();
       setInterval(function() {
         scheduleAvailability.checkAndUpdateScheduler();
-      }, 60000);  //TODO: replace with cfg param. AT present check for new availability schedule every minute
+        scheduleLatency.checkAndUpdateScheduler();
+      }, 60000);  //TODO: replace with cfg param. At present check for new availability schedule every minute
+      
+      //scheduleLatency.checkPublicationLatency();
       
     } else {
       wlogger.error('dbParams.username' + dbParams.username);

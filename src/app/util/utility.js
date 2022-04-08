@@ -229,4 +229,15 @@ exports.performDHuSServiceRequest = async (service, requestUrl) => {
   return response;
 }
 
+/* Get Referenced Source with greatest LastCreationDate*/
+exports.getActiveSource = (referencedSources) => {
+  var activeSource;
+  for (rs of referencedSources) {
+      if (activeSource == null || rs["LastCreationDate"] > activeSource["LastCreationDate"])
+        activeSource = rs;
+  }
+  return activeSource;
+
+}
+
 

@@ -178,9 +178,9 @@ exports.createScheduler = () => {
        
         if(conf.getConfig().availability && conf.getConfig().availability.schedule && conf.getConfig().availability.schedule !== '') {
             schedule = conf.getConfig().availability.schedule;
-            wlogger.info("Use configuration file scheduler: " + schedule);
+            wlogger.info("[Service Availability] Use configuration file scheduler: " + schedule);
         } else {
-            wlogger.info("No scheduler defined in configuration file for service availability. Using default scheduler: " + schedule);
+            wlogger.info("[Service Availability] No scheduler defined in configuration file for service availability. Using default scheduler: " + schedule);
         }
         job = cron.schedule(schedule, async() => {
             wlogger.info("Start verifying service availability...");
@@ -194,10 +194,10 @@ exports.createScheduler = () => {
 
 exports.checkAndUpdateScheduler = () => {
     try {
-        wlogger.debug("Check configured schedule");
+        wlogger.debug("[Service Availability] Check configured schedule");
         let newPeriod = (conf.getConfig().availability && conf.getConfig().availability.schedule) ? conf.getConfig().availability.schedule : null;
         if(newPeriod && newPeriod != schedule ) {
-            wlogger.info("Reschedule job, found new scheduling period: " + newPeriod);
+            wlogger.info("[Service Availability] Reschedule job, found new scheduling period: " + newPeriod);
             schedule = newPeriod;
             if (job) {
                 wlogger.info("Found not null job");	
@@ -229,9 +229,9 @@ exports.createPurgeScheduler = () => {
        
             if(conf.getConfig().availability && conf.getConfig().availability.purgeSchedule && conf.getConfig().availability.purgeSchedule !== '') {
                 purgeSchedule = conf.getConfig().availability.purgeSchedule;
-                wlogger.info("Use configuration file purgeSchedule: " + purgeSchedule);
+                wlogger.info("[Service Availability] Use configuration file purgeSchedule: " + purgeSchedule);
             } else {
-                wlogger.info("No purgeSchedule defined in configuration file for service availability. Using default purgeSchedule: " + purgeSchedule);
+                wlogger.info("[Service Availability] No purgeSchedule defined in configuration file for service availability. Using default purgeSchedule: " + purgeSchedule);
             }
             purgeJob = cron.schedule(purgeSchedule, async() => {
                 wlogger.info("Start purging service availability...");
