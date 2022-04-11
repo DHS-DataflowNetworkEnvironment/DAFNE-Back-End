@@ -11,6 +11,7 @@ const moment = require('moment');
 
 let job;
 let purgeJob;
+let feRetryJob;
 // default check publication latency schedule 10 minutes
 let schedule = "*/10 * * * *";
 // default purge publication latency  table, evry day at 01:00 AM
@@ -18,6 +19,11 @@ let purgeSchedule = "0 1 * * *";
 // default publication latency  rolling period 90 days
 let rollingPeriodInDays = 90;
 let enablePurge = true;
+
+// default check Front-End publication latency schedule 5 minutes
+let feRetrySchedule = "*/5 * * * *";
+// default Front-End publication latency number of retries
+let feMaxRetry = 10;
 
 const synchUrl = 'odata/v1/Synchronizers';
 const productSourcesUrl = 'odata/v2/ProductSources';
@@ -180,7 +186,7 @@ manageLatency = async (beProducts, sourceUrl, sourceService, service, feService,
 
 
 
-exports.checkPublicationLatency = async () => {
+checkPublicationLatency = async () => {
 	let status = 0;
 	try {
 		
@@ -438,5 +444,126 @@ exports.createPurgeScheduler = () => {
         wlogger.error("Error occurred while creating purgeSchedule for publication latency")
 		wlogger.error(error);
 	}
+};
+
+/**
+ * This method implements the retry mechanism, configurable in terms of frequency and maximum number of retries, useful to retrieve a product on FE 
+ */
+checkMissingFrontEndLatency = async () => {
+	try {
+        if(conf.getConfig().latency && conf.getConfig().latency.feMaxRetry ) {
+            if (isNaN(conf.getConfig().latency.feMaxRetry)) {
+                wlogger.warn(`The parameter latency.feMaxRetry must be a number. Found value: ${conf.getConfig().latency.feMaxRetry}`);
+                wlogger.warn(`Using default: ${feMaxRetry}`);
+            } else {
+                feMaxRetry = conf.getConfig().latency.feMaxRetry;
+            }
+        }
+		
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+        const feService = await Service.findOne({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [1, 2]  //Exclude BE services from services
+				}
+			},
+            order: [['service_type', 'DESC']] //Order by service_type DESC to get the FE in case an FE + Single Instance configured (not a real case)
+		});               
+        const feLatencyList = await PublicationLatency.findAll({
+            where: {
+                centre_id: centre.id,
+                retry: {[Sequelize.Op.lt]: feMaxRetry},
+                latency_be: {[Sequelize.Op.ne]: null},
+                latency_fe: {[Sequelize.Op.eq]: null}
+            },            
+            order: [['timestamp', 'DESC']]
+        });
+        for (const feLatency of feLatencyList) {
+            //console.log(feLatency);
+            let product;
+            let description;
+            const currentRetry = feLatency['retry'] + 1;
+            // Search on the local FE the referenced products used to compute Back-End latency and not yet found on FE
+            if (feService) {
+                let searchProductOnFeAndSource = searchProductOnService;
+                searchProductOnFeAndSource = searchProductOnFeAndSource.replace(':name',feLatency['product_name']);
+                wlogger.info(`Performing request ${searchProductOnFeAndSource} on Local FE ${feService.service_url} for retrieving product ${feLatency['product_name']} - ${feLatency['product_id']}.`);
+                const products = await utility.performDHuSServiceRequest(feService, searchProductOnFeAndSource);
+                if(products && products.status == 200 && products.data && products.data.value && products.data.value.length > 0) { 
+                    product =  products.data.value[0];
+                    wlogger.info(`Found product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE ${feService.service_url} after ${currentRetry} attempts.`);
+                    //compute latency in reference with local FE
+                } else {
+                    wlogger.info(`Cannot find yet product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE ${feService.service_url} after ${currentRetry} attempts.`);
+                    description = `Cannot find yet product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE after ${currentRetry} attempts.`;
+                }
+            } else {
+                wlogger.warn(`Cannot compute publication latency on local FE - No FE Service configured`);
+                description = `Cannot find yet product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE after ${currentRetry} attempts.`;
+                
+            }
+            const latencyFe =  (product) ? (new Date(product.CreationDate) - new Date(feLatency['creation_date_source'])) : null;     
+            // update retry
+            let latency = {retry: currentRetry, latency_fe: latencyFe, description: description};
+            const updatedLatency = await PublicationLatency.update(latency, { where: { id: feLatency['id'] } });   
+            wlogger.debug(`Updated latency for product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE ${feService.service_url} 
+            after ${currentRetry} attempts. New FE latency is ${latencyFe}`);
+            //wlogger.debug(updatedLatency);
+        }   
+           
+	} catch (error) {
+		wlogger.error(error);		
+	}
+};
+
+exports.createFeRetryScheduler = () => {
+ 
+    try {
+       
+        if(conf.getConfig().latency && conf.getConfig().latency.feRetrySchedule && conf.getConfig().latency.feRetrySchedule !== '') {
+            feRetrySchedule = conf.getConfig().latency.feRetrySchedule;
+            wlogger.info("[Publication Latency - FE Retry] Use configuration file scheduler for missing FE latency: " + feRetrySchedule);
+        } else {
+            wlogger.info("[Publication Latency - FE Retry] No scheduler defined in configuration file for missing FE publication latency. Using default scheduler: " + feRetrySchedule);
+        }
+        feRetryJob = cron.schedule(feRetrySchedule, async() => {
+            wlogger.info("Start verifying missing FE publication latency...");
+            const status = await checkMissingFrontEndLatency();           
+        })
+    } catch(error) {
+        wlogger.error("Error occurred while creating scheduler for missing FE publication latency")
+		wlogger.error(error);
+	}
+};
+
+exports.checkAndUpdateFeRetryScheduler = () => {
+    try {
+        wlogger.debug("[Publication Latency - FE Retry] Check configured schedule");
+        let newPeriod = (conf.getConfig().latency && conf.getConfig().latency.feRetrySchedule) ? conf.getConfig().latency.feRetrySchedule : null;
+        if(newPeriod && newPeriod != feRetrySchedule ) {
+            wlogger.info("[Publication Latency - FE Retry] Reschedule job, found new scheduling period: " + newPeriod);
+            feRetrySchedule = newPeriod;
+            if (feRetryJob) {
+                wlogger.info("Found not null job");	
+                feRetryJob.stop();
+                
+                feRetryJob = cron.schedule(feRetrySchedule, async() => {
+                    wlogger.info("Start verifying missing FE publication latency...");
+                    const status = await checkMissingFrontEndLatency();      
+                })
+
+            } else {
+                wlogger.info("No jobs found for missing FE publication latency");
+            }
+        }
+    } catch(error) {
+        wlogger.error("Error occurred while updating scheduler for missing FE publication latency")
+        wlogger.error(error);
+    }
 };
 

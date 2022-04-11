@@ -44,12 +44,14 @@ app.use('/products', require('./app/routes/products'));
       scheduleAvailability.createPurgeScheduler();
       scheduleLatency.createScheduler();
       scheduleLatency.createPurgeScheduler();
+      scheduleLatency.createFeRetryScheduler();
       setInterval(function() {
         scheduleAvailability.checkAndUpdateScheduler();
         scheduleLatency.checkAndUpdateScheduler();
+        scheduleLatency.checkAndUpdateFeRetryScheduler();
       }, 60000);  //TODO: replace with cfg param. At present check for new availability schedule every minute
       
-      //scheduleLatency.checkPublicationLatency();
+      
       
     } else {
       wlogger.error('dbParams.username' + dbParams.username);
