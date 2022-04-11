@@ -661,7 +661,7 @@ getFakeDataSourcesInfo = () => {
 	}
 };
 
-//Compute service availability related to provided date filters for the proveded FE or Single Instance centre
+//Compute service availability related to provided date filters for the provided FE or Single Instance centre
 // For all authenticated users
 /* Request body example:
  * {
@@ -744,7 +744,7 @@ exports.computeAvailability = async (req, res, next) => {
 };
 
 
-//Compute service availability related to provided date filters for the proveded FE or Single Instance centre
+//Compute service availability related to provided date filters for the provided FE or Single Instance centre
 // For all authenticated users
 /* Request body example:
  * {
@@ -796,6 +796,149 @@ exports.computeAverageAvailability = async (req, res, next) => {
 		wlogger.debug("Average Service Availability:");
 		wlogger.debug(availability)
 		return res.status(200).json(availability);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//Compute service latency related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
+// For all authenticated users
+/* Request body example:
+ * {
+ 	"startDate":"2021-11-05",
+	"stopDate":"2021-11-06",
+	"synchId": 0,
+	"synchLabel": "S2B"
+	"backendUrl": "https://apihub.copernicus.eu/apihub"
+ * }
+   Response example
+   {
+	"centreId": "1",
+	"values": [{
+		"day": "2022-04-02",
+		"centre_id": 1,
+		"synch_id": 1,
+		"synch_label": "S2B",
+		"average_fe": null,
+		"average_be": 878656940.00000000,
+		"number_of_measurements": 24
+		}]
+	}
+*/
+exports.computeLatency = async (req, res, next) => {
+	let publication_latency = {};
+	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	wlogger.info("computeLatency: [GET] /centres/:id/service/latency/daily");
+	try {
+		if (isNaN(req.params.id)) {
+			return res.status(400).json("Centre must be a number");
+		}
+		publication_latency.centreId = req.params.id;
+		wlogger.debug("request body");
+		wlogger.debug(req.body);
+		if (!req.body.startDate || !req.body.stopDate) {
+			return res.status(400).json("Not valid Date range");
+		}		
+		if (!moment(req.body.startDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() ) {
+			return res.status(400).json("Invalid Date Format")
+		}
+		if(req.body.startDate > req.body.stopDate) {
+			return res.status(400).json("startDate must be greater or equal than stopDate");
+		}
+		
+		wlogger.info(`Compute publication latency between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
+		 of the BE ${req.body.backendUrl}` );
+		
+		// Add query to retrieve availability results
+		const itemList = await sequelize.query(
+			query,
+			{
+				replacements: [req.params.id, req.body.synchId, req.body.synchLabel, req.body.backendUrl, req.body.startDate, req.body.stopDate],
+				type: Sequelize.QueryTypes.SELECT
+			}
+		);
+		publication_latency.values = itemList;
+		wlogger.debug("Daily Publication Layency:");
+		wlogger.debug(publication_latency)
+		return res.status(200).json(publication_latency);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//Compute service latency daily details related to provided date for the provided centre, BE Service and sync (identified by id/label)
+// For all authenticated users
+/* Request body example:
+ * {
+ 	"date":"2021-11-05",
+	"synchId": 0,
+	"synchLabel": "S2B"
+	"backendUrl": "https://apihub.copernicus.eu/apihub"
+ * }
+   Response example
+   {
+	"centreId": "1",
+	"values": [{
+		"timezone": "2022-04-11 13:09:30",
+		"centre_id": 1,
+		"synch_id": 1,
+		"synch_label": "S2B",
+		"average_fe": null,
+		"average_be": 856016551
+		},{
+		"timezone": "2022-04-11 13:23:57",
+		"centre_id": 1,
+		"synch_id": 1,
+		"synch_label": "S2B",
+		"average_fe": null,
+		"average_be": 857024401
+		},{
+		"timezone": "2022-04-11 13:44:50",
+		"centre_id": 1,
+		"synch_id": 1,
+		"synch_label": "S2B",
+		"average_fe": null,
+		"average_be": 857922853
+		}]
+	}
+*/
+exports.computeLatencyDetails = async (req, res, next) => {
+	let publication_latency = {};
+	//let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe, latency_be from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', "timestamp") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
+	let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe, latency_be from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
+	wlogger.info("computeLatencyDetails: [GET] /centres/:id/service/latency/daily/details");
+	try {
+		if (isNaN(req.params.id)) {
+			return res.status(400).json("Centre must be a number");
+		}
+		publication_latency.centreId = req.params.id;
+		wlogger.debug("request body");
+		wlogger.debug(req.body);
+		if (!req.body.date) {
+			return res.status(400).json("Not valid Date");
+		}		
+		if (!moment(req.body.date, "YYYY-MM-DD", true).isValid() ) {
+			return res.status(400).json("Invalid Date Format")
+		}
+		
+		wlogger.info(`Compute publication latency details in the date ${req.body.date} for the sync ${req.body.synchId} - ${req.body.synchLabel}
+		 of the BE ${req.body.backendUrl}` );
+		
+		// Add query to retrieve availability results
+		const itemList = await sequelize.query(
+			query,
+			{
+				replacements: [req.params.id, req.body.synchId, req.body.synchLabel, req.body.backendUrl, req.body.date],
+				type: Sequelize.QueryTypes.SELECT
+			}
+		);
+		publication_latency.values = itemList;
+		wlogger.debug("Daily Publication Layency Details:");
+		wlogger.debug(publication_latency)
+		return res.status(200).json(publication_latency);
 	} catch (error) {
 		wlogger.error(error);
 		return res.status(500).json(error);

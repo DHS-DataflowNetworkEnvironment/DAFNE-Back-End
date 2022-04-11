@@ -4,6 +4,9 @@ const Service = require("../models/service");
 //Util imports
 const wlogger = require('../util/wlogger');
 const Utilcrypto = require('../util/Utilcrypto');
+const utility = require('../util/utility');
+
+const getSynchronizersUrl = 'odata/v2/Synchronizers';
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -125,4 +128,28 @@ exports.deleteOne = async (req, res) => {
 	}
 };
 
+
+/** [GET] /services/1/synchronizers
+ * 	GET ONE
+ *
+ * 	@param {string} req.params.id id of the service to get
+ *
+ * 	@returns {Service} the service with the id requested
+ */
+ exports.getSynchronizers = async (req, res) => {
+	wlogger.debug("getSynchronizers: [GET] /services/:id/synchronizers");
+	try {
+		const s = await Service.findByPk(req.params.id);
+		const synchList = await utility.performDHuSServiceRequest(s, getSynchronizersUrl);
+		if(synchList && synchList.status == 200 && synchList.data ) { 
+			return res.status(200).json(synchList.data.value);
+		} else {
+			return res.status(500).json("Error Getting Synchronizers list");
+		}		
+	} catch (error) {
+		wlogger.error({ "ERROR getSynchronizers Service: ": error });
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
 
