@@ -13,7 +13,7 @@ let job;
 let purgeJob;
 let feRetryJob;
 // default check publication latency schedule 10 minutes
-let schedule = "*/10 * * * *";
+let schedule = "0 * * * *";
 // default purge publication latency  table, evry day at 01:00 AM
 let purgeSchedule = "0 1 * * *";
 // default publication latency  rolling period 90 days

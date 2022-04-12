@@ -828,8 +828,8 @@ exports.computeAverageAvailability = async (req, res, next) => {
 */
 exports.computeLatency = async (req, res, next) => {
 	let publication_latency = {};
-	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
 	wlogger.info("computeLatency: [GET] /centres/:id/service/latency/daily");
 	try {
 		if (isNaN(req.params.id)) {
