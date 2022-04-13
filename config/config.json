@@ -41,7 +41,8 @@
 		"purgeSchedule": "0 1 * * *",
 		"rollingPeriodInDays": 90,
 		"feRetrySchedule": "*/5 * * * *",
-		"feMaxRetry": 10
+		"feMaxRetry": 10,
+		"tolerance": 1
 	  },
 	"requestTimeout": 30000,
 	"dataSourceStatus": ["RUNNING", "PENDING"],
