@@ -7,6 +7,7 @@ const Utilcrypto = require('../util/Utilcrypto');
 const utility = require('../util/utility');
 
 const getSynchronizersUrl = 'odata/v2/Synchronizers';
+const getProductSourcesUrl = '/odata/v2/ProductSources';
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -134,7 +135,7 @@ exports.deleteOne = async (req, res) => {
  *
  * 	@param {string} req.params.id id of the service to get
  *
- * 	@returns {Service} the service with the id requested
+ * 	@returns {Synchronizers} List of Synchronizers of the service with the id requested
  */
  exports.getSynchronizers = async (req, res) => {
 	wlogger.debug("getSynchronizers: [GET] /services/:id/synchronizers");
@@ -153,3 +154,28 @@ exports.deleteOne = async (req, res) => {
 	}
 };
 
+/** [GET] /services/1/synchronizers/intelligentSyncSupport
+ *
+ * 	@param {string} req.params.id id of the service to get
+ *
+ * 	@returns {boolean} if intelligent synchronizers are supported or not
+ */
+ exports.geIntelligentSyncSupport = async (req, res) => {
+	wlogger.debug("geIntelligentSyncSupport: [GET] /services/:id/synchronizers/intelligentSyncSupport");
+	try {
+		const s = await Service.findByPk(req.params.id);
+		const sources = await utility.performDHuSServiceRequest(s, getProductSourcesUrl);
+		wlogger.debug("geIntelligentSyncSupport - Product Sources HTTP response");
+		//console.log(sources);
+		// Get info from odata/v1 synchronizers
+		if (sources && sources.status == 404) {
+			return res.status(200).json(false);
+		} else {
+			return res.status(200).json(true);
+		}			
+	} catch (error) {
+		wlogger.error({ "ERROR geIntelligentSyncSupport Service: ": error });
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};

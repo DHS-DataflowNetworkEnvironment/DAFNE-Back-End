@@ -14,6 +14,7 @@ const collectionsUrl = 'odata/v2/Collections?$select=Name'
 const targetCollectionUrl = 'odata/v1/Synchronizers(:idL)/TargetCollection'
 const updateSynchUrl = 'odata/v1/Synchronizers(:idL)'
 const getSynchronizersUrl = 'odata/v2/Synchronizers';
+const getProductSourcesUrl = '/odata/v2/ProductSources';
 
 
 //GET-ALL Get all synchronizers of the local Centre
@@ -41,6 +42,7 @@ exports.getAll = async (req, res, next) => {
 		let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
 		for (const service of services) {
 			let synchList = [];
+			
 			let source = axios.CancelToken.source();
 			timeout = setTimeout(() => {
 				source.cancel();
@@ -163,6 +165,13 @@ exports.getAll = async (req, res, next) => {
 				wlogger.debug(collectionList);
 			}
 			let synchObj = {};
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+            wlogger.debug("Synchronizers - Product Sources HTTP response");
+            if (sources && sources.status == 404) {
+				synchObj.intelligentSyncSupported = false;
+			} else {
+				synchObj.intelligentSyncSupported = true;
+			}			
 			synchObj.serviceUrl = service.service_url;
 			synchObj.synchronizers = synchList;
 			synchObj.collections = collectionList;
