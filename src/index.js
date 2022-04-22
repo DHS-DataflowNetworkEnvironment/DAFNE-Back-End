@@ -31,6 +31,7 @@ app.use('/services', require('./app/routes/services'));
 app.use('/centres', require('./app/routes/centres'));
 app.use('/synchronizers', require('./app/routes/synchronizers'));
 app.use('/products', require('./app/routes/products'));
+app.use('/config', require('./app/routes/config'));
 
 (async () => {
   wlogger.log({ level: 'info', message: process.env });  //Log ENVIRONMENT VARIABLES
