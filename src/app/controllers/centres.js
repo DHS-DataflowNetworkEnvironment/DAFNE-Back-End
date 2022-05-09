@@ -829,7 +829,7 @@ exports.computeAverageAvailability = async (req, res, next) => {
 exports.computeLatency = async (req, res, next) => {
 	let publication_latency = {};
 	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe::float) as average_fe, avg(latency_be::float) as average_be, avg(case when latency_fe is not null then latency_fe::float else latency_be::float end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
 	wlogger.info("computeLatency: [GET] /centres/:id/service/latency/daily");
 	try {
 		if (isNaN(req.params.id)) {
@@ -908,7 +908,7 @@ exports.computeLatency = async (req, res, next) => {
 exports.computeLatencyDetails = async (req, res, next) => {
 	let publication_latency = {};
 	//let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe, latency_be from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', "timestamp") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
-	let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe, latency_be from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
+	let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe::float, latency_be::float from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
 	wlogger.info("computeLatencyDetails: [GET] /centres/:id/service/latency/daily/details");
 	try {
 		if (isNaN(req.params.id)) {
