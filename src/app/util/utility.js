@@ -4,10 +4,10 @@ const axios = require('axios');
 const urljoin = require('url-join');
 const Utilcrypto = require('../util/Utilcrypto');
 
-const regex_substring = /^.*substringof\('(.*)',Name\).*/gm;
-const regex_startswith = /^.*startswith\(Name,'(.*)'\).*/gm;
+const regex_substring = /^.*substringof\(\s*?'(.*)'\s*?,\s*?Name\s*?\).*/gm;
+const regex_startswith = /^.*startswith\(\s*?Name\s*?,\s*?'(.*)'\s*?\).*/gm;
 const regex_endswith = /^.*endswith\(Name,'(.*)'\).*/gm;
-const regex_contains = /^.*contains\('(.*)',Name\).*/gm;
+const regex_contains = /^.*contains\(\s*?'(.*)'\s*?,\s*?Name\s*?\).*/gm;
 const online = " Online eq true"
 const offline = " Online eq false" 
 

@@ -46,7 +46,7 @@
 	  },
 	"requestTimeout": 30000,
 	"dataSourceStatus": ["RUNNING", "PENDING"],
-	"version": "2.0.1",
+	"version": "2.0.2",
         "port": 2000,
 	"adminRole": "DATAFLOW_MANAGER"
 }
