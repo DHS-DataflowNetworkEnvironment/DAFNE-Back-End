@@ -15,4 +15,7 @@ router.put('/:id', isAuth, isAdmin, controller.updateOne);
 //DELETE ONE Synchronizer -> [DELETE] ../Synchronizer/id
 router.delete('/:id', isAuth, isAdmin, controller.deleteOne);
 
+//READ ALL Synchronizers V2-> [GET] ../synchronizers/v2
+router.get('/v2', isAuth, controller.getAllV2);
+
 module.exports = router;

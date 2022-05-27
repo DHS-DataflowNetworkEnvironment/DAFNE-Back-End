@@ -30,4 +30,18 @@ router.get('/:id/map/datasourcesinfo', isAuth, controller.getMapDataSourcesInfo)
 
 //[GET] ../centres/id/map/dhsconnected
 router.get('/:id/map/dhsconnected', isAuth, controller.getMapDhsConnected);
+
+//[POST] ../centres/id/service/availability
+router.post('/:id/service/availability', isAuth, controller.computeAvailability);
+
+//[POST] ../centres/id/service/availability/average
+router.post('/:id/service/availability/average', isAuth, controller.computeAverageAvailability);
+
+//[POST] ../centres/id/service/latency/daily
+router.post('/:id/service/latency/daily', isAuth, controller.computeLatency);
+
+//[POST] ../centres/id/service/latency/daily/details
+router.post('/:id/service/latency/daily/details', isAuth, controller.computeLatencyDetails);
+
 module.exports = router;
+

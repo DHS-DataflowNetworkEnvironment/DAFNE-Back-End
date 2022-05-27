@@ -13,6 +13,8 @@ const synchUrl = 'odata/v1/Synchronizers'
 const collectionsUrl = 'odata/v2/Collections?$select=Name'
 const targetCollectionUrl = 'odata/v1/Synchronizers(:idL)/TargetCollection'
 const updateSynchUrl = 'odata/v1/Synchronizers(:idL)'
+const getSynchronizersUrl = 'odata/v2/Synchronizers';
+const getProductSourcesUrl = '/odata/v2/ProductSources';
 
 
 //GET-ALL Get all synchronizers of the local Centre
@@ -40,6 +42,7 @@ exports.getAll = async (req, res, next) => {
 		let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
 		for (const service of services) {
 			let synchList = [];
+			
 			let source = axios.CancelToken.source();
 			timeout = setTimeout(() => {
 				source.cancel();
@@ -162,6 +165,13 @@ exports.getAll = async (req, res, next) => {
 				wlogger.debug(collectionList);
 			}
 			let synchObj = {};
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+            wlogger.debug("Synchronizers - Product Sources HTTP response");
+            if (sources && sources.status == 404) {
+				synchObj.intelligentSyncSupported = false;
+			} else {
+				synchObj.intelligentSyncSupported = true;
+			}			
 			synchObj.serviceUrl = service.service_url;
 			synchObj.synchronizers = synchList;
 			synchObj.collections = collectionList;
@@ -479,5 +489,44 @@ exports.generateBodyFromModel = (model) => {
         </content> \
       </entry>';
 
+};
+
+//GET-ALL Get all synchronizers v2 of the local Centre
+// For all authenticated users
+exports.getAllV2 = async (req, res, next) => {
+	let synchronizers = [];
+		
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [1, 3]  //Exclude FE services from synch list
+				}
+			}
+		});
+		
+		for (const service of services) {
+			
+			const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
+			if(synchList && synchList.status == 200 && synchList.data ) {
+				let synchObj = {};
+				synchObj.serviceUrl = service.service_url;
+				synchObj.synchronizers = synchList.data.value;
+				synchronizers.push(synchObj); 				
+			} 			
+		}
+		wlogger.info({ "OK getAll Synchronizers V2:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
 };
 

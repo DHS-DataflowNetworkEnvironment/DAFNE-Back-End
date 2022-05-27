@@ -1,10 +1,13 @@
 const wlogger = require('../util/wlogger');
 const conf = require('../util/config');
+const axios = require('axios');
+const urljoin = require('url-join');
+const Utilcrypto = require('../util/Utilcrypto');
 
-const regex_substring = /^.*substringof\('(.*)',Name\).*/gm;
-const regex_startswith = /^.*startswith\(Name,'(.*)'\).*/gm;
+const regex_substring = /^.*substringof\(\s*?'(.*)'\s*?,\s*?Name\s*?\).*/gm;
+const regex_startswith = /^.*startswith\(\s*?Name\s*?,\s*?'(.*)'\s*?\).*/gm;
 const regex_endswith = /^.*endswith\(Name,'(.*)'\).*/gm;
-const regex_contains = /^.*contains\('(.*)',Name\).*/gm;
+const regex_contains = /^.*contains\(\s*?'(.*)'\s*?,\s*?Name\s*?\).*/gm;
 const online = " Online eq true"
 const offline = " Online eq false" 
 
@@ -40,6 +43,36 @@ exports.parseDataSourceInfo = (data, centre) => {
     if (data) {
      
       let lastCreationDate = this.parseJsonDate(data.LastCreationDate);
+      let filter = (data.FilterParam) ? this.parseODataFilter(data.FilterParam) : "All product types ";
+      let rawFilter = (data.FilterParam) ? data.FilterParam : "All product types";
+      dsInfo.info = filter;
+      dsInfo.filter = rawFilter + " ";
+      dsInfo.lastCreationDate = lastCreationDate;
+      if(centre) {
+        dsInfo.centre =  centre;
+      }
+    }
+  } catch (error) {
+		wlogger.error('Error parsing DataSource Info');
+		wlogger.error(error);
+	}
+  return dsInfo;
+};
+
+exports.parseV2DataSourceInfo = (data, refSource, source, centre) => {
+  var dsInfo = {};
+  try {
+    if (data) {
+
+      let lastCreationDate = 'N/A';
+      
+      if(refSource.LastCreationDate) {
+        lastCreationDate = refSource.LastCreationDate;
+      } else if (source.LastCreationDate) {
+        lastCreationDate = source.LastCreationDate;
+      } else {
+        lastCreationDate = this.parseJsonDate(data.LastCreationDate);
+      }       
       let filter = (data.FilterParam) ? this.parseODataFilter(data.FilterParam) : "All product types ";
       let rawFilter = (data.FilterParam) ? data.FilterParam : "All product types";
       dsInfo.info = filter;
@@ -157,3 +190,54 @@ exports.getDatesList = (start, stop)  => {
   }
   return dates;
 };
+
+
+exports.performDHuSServiceRequest = async (service, requestUrl) => {
+  const source = axios.CancelToken.source();
+  let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
+  timeout = setTimeout(() => {
+    source.cancel();
+    wlogger.error("No response received from Service " + service.service_url); 
+    wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+  }, requestTimeout);
+  const response = await axios({
+    method: 'get',
+    url: urljoin(service.service_url, requestUrl),
+    auth: {
+      username: service.username,
+      password: Utilcrypto.decrypt(service.password)
+    },
+    validateStatus: false,
+    cancelToken: source.token
+  }).catch(err => {
+    if (err.response) {
+    // client received an error response (5xx, 4xx)
+    wlogger.error("Received error response from Service " + service.service_url); 
+    wlogger.error(err);
+    } else if (err.request) {
+    // client never received a response, or request never left
+    wlogger.error("No response received from Service " + service.service_url); 
+    wlogger.error(err);
+    } else {
+    // anything else
+    wlogger.error("Error from Service " + service.service_url); 
+    wlogger.error(err);
+    }
+  });
+  // Clear The Timeout
+  clearTimeout(timeout);
+  return response;
+}
+
+/* Get Referenced Source with greatest LastCreationDate*/
+exports.getActiveSource = (referencedSources) => {
+  var activeSource;
+  for (rs of referencedSources) {
+      if (activeSource == null || rs["LastCreationDate"] > activeSource["LastCreationDate"])
+        activeSource = rs;
+  }
+  return activeSource;
+
+}
+
+
