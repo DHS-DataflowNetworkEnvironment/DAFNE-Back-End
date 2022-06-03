@@ -665,8 +665,8 @@ getFakeDataSourcesInfo = () => {
 // For all authenticated users
 /* Request body example:
  * {
- 	"startDate":"2021-11-05",
-	"stopDate":"2021-11-06"
+ 	"startDate":"2021-11-05T00:00:00",
+	"stopDate":"2021-11-06T23:59:59"
  * }
    Response example
    {
@@ -743,13 +743,90 @@ exports.computeAvailability = async (req, res, next) => {
 	}
 };
 
+//Compute weekly service availability related to provided date filters for the provided FE or Single Instance centre
+// For all authenticated users
+/* Request body example:
+ * {
+ 	"startDate":"2022-05-01T00:00:00",
+	"stopDate":"2022-05-21T23:59:59"
+ * }
+   Response example
+{
+    "centreId": "24",
+    "values": [
+        {
+            "date": "2022-05-02",
+            "successResponses": "60",
+            "totalRequests": "161",
+            "percentage": 37.267080745341616,
+            "average": 72.18532321141016
+        },
+        {
+            "date": "2022-05-09",
+            "successResponses": "113",
+            "totalRequests": "125",
+            "percentage": 90.4,
+            "average": 72.18532321141016
+        },
+        {
+            "date": "2022-05-16",
+            "successResponses": "64",
+            "totalRequests": "72",
+            "percentage": 88.88888888888889,
+            "average": 72.18532321141016
+        }
+    ]
+}
+*/
+exports.computeAvailabilityWeekly = async (req, res, next) => {
+	let availability = {};
+	//let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY week) x ORDER BY week";
+	let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT avg(count/total::float)*100 FROM (SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week) z ) average FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week ) x ORDER BY week";
+	wlogger.info("computeAvailabilityWeekly: [GET] /centres/:id/service/availability/weekly");
+	try {
+		if (isNaN(req.params.id)) {
+			return res.status(400).json("Centre must be a number");
+		}
+		availability.centreId = req.params.id;
+		wlogger.debug("request body");
+		wlogger.debug(req.body);
+		if (!req.body.startDate || !req.body.stopDate) {
+			return res.status(400).json("Not valid Date range");
+		}		
+		if (!moment(req.body.startDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() ) {
+			return res.status(400).json("Invalid Date Format")
+		}
+		if(req.body.startDate > req.body.stopDate) {
+			return res.status(400).json("startDate must be greater or equal than stopDate");
+		}
+		
+		wlogger.info("Compute weekly availability between " + req.body.startDate + " and " + req.body.stopDate);
+		
+		// Add query to retrieve availability results
+		const itemList = await sequelize.query(
+			query,
+			{
+				replacements: [req.body.startDate, req.body.stopDate, req.params.id, req.body.startDate, req.body.stopDate, req.params.id],
+				type: Sequelize.QueryTypes.SELECT
+			}
+		);
+		availability.values = itemList;
+		wlogger.debug("Weekly Service Availability:");
+		wlogger.debug(availability)
+		return res.status(200).json(availability);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
 
 //Compute service availability related to provided date filters for the provided FE or Single Instance centre
 // For all authenticated users
 /* Request body example:
  * {
- 	"startDate":"2021-11-05",
-	"stopDate":"2021-11-06"
+ 	"startDate":"2021-11-05T00:00:00",
+	"stopDate":"2021-11-06T23:59:59"
  * }
    Response example
    {
@@ -861,6 +938,76 @@ exports.computeLatency = async (req, res, next) => {
 		);
 		publication_latency.values = itemList;
 		wlogger.debug("Daily Publication Layency:");
+		wlogger.debug(publication_latency)
+		return res.status(200).json(publication_latency);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//Compute weekly service latency related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
+// For all authenticated users
+/* Request body example:
+{
+ 	"startDate":"2022-05-01",
+	"stopDate":"2022-05-21",
+	"synchId": 0,
+	"synchLabel": "S2B"
+	"backendUrl": "https://apihub.copernicus.eu/apihub"
+}
+   Response example
+{
+    "centreId": "24",
+    "values": [
+        {
+            "week": "2022-05-02",
+            "centre_id": 24,
+            "synch_id": 3,
+            "synch_label": "S2 L2A",
+            "average_fe": 1346705456.7605634,
+            "average_be": 1346705456.7605634,
+            "average_latency": 1346705456.7605634,
+            "number_of_measurements": "213"
+        }
+    ]
+}
+*/
+exports.computeLatencyWeekly = async (req, res, next) => {
+	let publication_latency = {};
+	//let query = "select to_char(date_trunc('week', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by week, centre_id, synch_id, synch_label";
+	let query = "select to_char(date_trunc('week', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe::float) as average_fe, avg(latency_be::float) as average_be, avg(case when latency_fe is not null then latency_fe::float else latency_be::float end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	wlogger.info("computeLatencyWeekly: [GET] /centres/:id/service/latency/weekly");
+	try {
+		if (isNaN(req.params.id)) {
+			return res.status(400).json("Centre must be a number");
+		}
+		publication_latency.centreId = req.params.id;
+		wlogger.debug("request body");
+		wlogger.debug(req.body);
+		if (!req.body.startDate || !req.body.stopDate) {
+			return res.status(400).json("Not valid Date range");
+		}		
+		if (!moment(req.body.startDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() || !moment(req.body.stopDate, "YYYY-MM-DDTHH:mm:ss", true).isValid() ) {
+			return res.status(400).json("Invalid Date Format")
+		}
+		if(req.body.startDate > req.body.stopDate) {
+			return res.status(400).json("startDate must be greater or equal than stopDate");
+		}
+		
+		wlogger.info(`Compute weekly publication latency between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
+		 of the BE ${req.body.backendUrl}` );
+		
+		// Add query to retrieve availability results
+		const itemList = await sequelize.query(
+			query,
+			{
+				replacements: [req.params.id, req.body.synchId, req.body.synchLabel, req.body.backendUrl, req.body.startDate, req.body.stopDate],
+				type: Sequelize.QueryTypes.SELECT
+			}
+		);
+		publication_latency.values = itemList;
+		wlogger.debug("Weekly Publication Layency:");
 		wlogger.debug(publication_latency)
 		return res.status(200).json(publication_latency);
 	} catch (error) {
