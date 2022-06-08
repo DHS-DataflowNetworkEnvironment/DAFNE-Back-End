@@ -7,4 +7,7 @@ const isAuth = require('../auth/is-auth');
 //Compute completeness -> [POST] ../products/completeness
 router.post('/completeness', isAuth, controller.computeCompleteness);
 
+//Compute completeness from sync filter -> [POST] ../products/completeness
+router.post('/filter-completeness', isAuth, controller.computeFilterCompleteness);
+
 module.exports = router;

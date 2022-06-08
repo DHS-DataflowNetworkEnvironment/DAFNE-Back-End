@@ -7,6 +7,9 @@ const isAdmin = require('../auth/is-admin');
 //READ ALL Synchronizers -> [GET] ../synchronizers
 router.get('/', isAuth, controller.getAll);
 
+//READ ALL FE Synchronizers -> [GET] ../synchronizers/fe
+router.get('/fe', isAuth, controller.getAllFE);
+
 //CREATE ONE Synchronizer -> [POST] ../synchronizers
 router.post('/', isAuth, isAdmin, controller.createOne);
 
