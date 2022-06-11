@@ -10,6 +10,12 @@ router.get('/', isAuth, controller.getAll);
 //READ ALL FE Synchronizers -> [GET] ../synchronizers/fe
 router.get('/fe', isAuth, controller.getAllFE);
 
+//READ ALL BE Synchronizers -> [GET] ../synchronizers/be
+router.get('/be', isAuth, controller.getAllBE);
+
+//READ ALL SI Synchronizers -> [GET] ../synchronizers/si
+router.get('/si', isAuth, controller.getAllSI);
+
 //CREATE ONE Synchronizer -> [POST] ../synchronizers
 router.post('/', isAuth, isAdmin, controller.createOne);
 
