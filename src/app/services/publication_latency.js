@@ -32,16 +32,28 @@ const searchProductByFilter = 'odata/v1/Products?$filter=:filter&$orderby=Creati
 const searchProductOnService = "odata/v2/Products?$filter=Name eq ':name'&$top=1";
 
 
-getSourceService = async(sourceUrl) => {
+getSourceService = async(url) => {
     let sourceService;
+    let sourceUrl = url;
+    if (sourceUrl.lastIndexOf('/') == sourceUrl.length -1) {
+        sourceUrl = sourceUrl.slice(0, -1);
+    }
+    
     try {
+        // Find service without '/' in the end 
         sourceService = await Service.findOne({
             where: {
-                service_url: {
-                    [Sequelize.Op.like]: sourceUrl + '%'
-                }
+                service_url:  sourceUrl 
             }
         });
+        // Try finding service with '/' in the end if not found at first attempt
+        if(!sourceService) {
+            sourceService = await Service.findOne({
+                where: {
+                    service_url: sourceUrl + '/'
+                }
+            });
+        }
     } catch (error) {
         wlogger.error(`Error searching sourceUrl ${sourceUrl} in the DAFNE DB `);
         wlogger.error(error);

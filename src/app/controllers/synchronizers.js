@@ -731,14 +731,20 @@ exports.getAllSI = async (req, res, next) => {
 		if (serviceUrl.lastIndexOf('/') == serviceUrl.length -1) {
 			serviceUrl = serviceUrl.slice(0, -1);
 		}
-		
-		const service = await Service.findOne({
+		// Find service without '/' in the end 
+		let service = await Service.findOne({
 			where: {
-				service_url: {
-					[Sequelize.Op.like]: serviceUrl + '%'
-				  }
+				service_url: serviceUrl
 			}
 		});
+		// Try finding service with '/' in the end if not found at first attempt
+		if(!service) {
+			service = await Service.findOne({
+				where: {
+					service_url: serviceUrl + '/'
+				}
+			});
+		}
 		if(!service) {
 			return res.status(404).json("Service not found!");
 		}
@@ -833,13 +839,20 @@ exports.updateOne = async (req, res) => {
 			serviceUrl = serviceUrl.slice(0, -1);
 		}
 		
-		const service = await Service.findOne({
+		// Find service without '/' in the end 
+		let service = await Service.findOne({
 			where: {
-				service_url: {
-					[Sequelize.Op.like]: serviceUrl + '%'
-				  }
+				service_url: serviceUrl
 			}
 		});
+		// Try finding service with '/' in the end if not found at first attempt
+		if(!service) {
+			service = await Service.findOne({
+				where: {
+					service_url: serviceUrl + '/'
+				}
+			});
+		}
 		if(!service) {
 			return res.status(404).json("Service not found!");
 		}
@@ -914,13 +927,20 @@ exports.updateOne = async (req, res) => {
 			serviceUrl = serviceUrl.slice(0, -1);
 		}
 		
-		const service = await Service.findOne({
+		// Find service without '/' in the end 
+		let service = await Service.findOne({
 			where: {
-				service_url: {
-					[Sequelize.Op.like]: serviceUrl + '%'
-				  }
+				service_url: serviceUrl
 			}
 		});
+		// Try finding service with '/' in the end if not found at first attempt
+		if(!service) {
+			service = await Service.findOne({
+				where: {
+					service_url: serviceUrl + '/'
+				}
+			});
+		}
 		if (!service) {
 			return res.status(404).json("Service not found!");
 		}
