@@ -63,7 +63,7 @@ exports.computeCompleteness = async (req, res, next) => {
 					where: {
 						centre: centre.id,
 						service_type: {
-							[Sequelize.Op.in]: [1, 2, 4, 5, 6]  //Exclude BE services from completeness computation
+							[Sequelize.Op.in]: [1, 2, 4, 5, 6]  //Exclude BE services from completeness computation and substringof('A',Name) 
 						}
 					}
 				});
@@ -97,7 +97,6 @@ exports.computeCompleteness = async (req, res, next) => {
 								},
 								validateStatus: false,
 								cancelToken: source.token
-								
 							}).catch(err => {
 								if (err.response) {
 								// client received an error response (5xx, 4xx)
@@ -117,8 +116,11 @@ exports.computeCompleteness = async (req, res, next) => {
     						clearTimeout(timeout);
 							let value;
 							if(count && count.status == 200){
-							
-								value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data };
+								if (service.service_type < 4) {
+									value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data };
+								} else {
+									value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data["@odata.count"] };
+								}
 							} else {
 								value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": -1 };
 							}
