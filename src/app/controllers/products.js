@@ -11,7 +11,7 @@ const conf = require('../util/config');
 const stringify = require('json-stable-stringify');
 
 const productsUrl_odata_v1 = "odata/v1/Products/$count?$filter=startswith(Name,':mission') and substringof(':type',Name) and CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'"
-const productsUrl_odata_v4 = "odata/v1/Products/$count?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge datetime':dateT00:00:00.000' and PublicationDate le datetime':dateT23:59:59.999'"
+const productsUrl_odata_v4 = "odata/v1/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json"
 const productsFilterUrl = "odata/v1/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'"
 
 
