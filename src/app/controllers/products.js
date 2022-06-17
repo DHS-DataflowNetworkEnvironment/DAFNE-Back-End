@@ -10,7 +10,8 @@ const wlogger = require('../util/wlogger');
 const conf = require('../util/config');
 const stringify = require('json-stable-stringify');
 
-const productsUrl = "odata/v1/Products/$count?$filter=startswith(Name,':mission') and substringof(':type',Name) and CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'"
+const productsUrl_odata_v1 = "odata/v1/Products/$count?$filter=startswith(Name,':mission') and substringof(':type',Name) and CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'"
+const productsUrl_odata_v4 = "odata/v1/Products/$count?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge datetime':dateT00:00:00.000' and PublicationDate le datetime':dateT23:59:59.999'"
 const productsFilterUrl = "odata/v1/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'"
 
 
@@ -54,13 +55,15 @@ exports.computeCompleteness = async (req, res, next) => {
 		const centres = await Centre.findAll({});
 		
 		for (const centre of centres) {
+			
+			/* DHuS */
 			try {
-				// Get the FE or Single Instance services of each centre
+				// Get the FE ,Single Instance, DAS, PRIP or LTA services of each centre
 				const service = await Service.findOne({
 					where: {
 						centre: centre.id,
 						service_type: {
-							[Sequelize.Op.in]: [1, 2]  //Exclude BE services from completeness computation
+							[Sequelize.Op.in]: [1, 2, 4, 5, 6]  //Exclude BE services from completeness computation
 						}
 					}
 				});
@@ -69,7 +72,12 @@ exports.computeCompleteness = async (req, res, next) => {
 					for (const date of dateRange) {
 						let timeout;
 						try {
-							let requestUrl = productsUrl.replace(':mission', mission).replace(':type', productType).replace(':filter', filter);
+							let requestUrl;
+							if (service.service_type < 4) {
+								requestUrl = productsUrl_odata_v1.replace(':mission', mission).replace(':type', productType);
+							} else {
+								requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
+							}
 							requestUrl = requestUrl.replace(/:date/g, date);
 							wlogger.debug("current requestUrl");
 							wlogger.debug(urljoin(service.service_url, requestUrl));
