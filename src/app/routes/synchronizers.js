@@ -8,13 +8,13 @@ const isAdmin = require('../auth/is-admin');
 router.get('/', isAuth, controller.getAll);
 
 //READ ALL FE Synchronizers -> [GET] ../synchronizers/fe
-router.get('/fe', isAuth, controller.getAllFE);
+router.get('/fe', isAuth, controller.getAllV2FE);
 
 //READ ALL BE Synchronizers -> [GET] ../synchronizers/be
-router.get('/be', isAuth, controller.getAllBE);
+router.get('/be', isAuth, controller.getAllV2BE);
 
 //READ ALL SI Synchronizers -> [GET] ../synchronizers/si
-router.get('/si', isAuth, controller.getAllSI);
+router.get('/si', isAuth, controller.getAllV2SI);
 
 //CREATE ONE Synchronizer -> [POST] ../synchronizers
 router.post('/', isAuth, isAdmin, controller.createOne);
