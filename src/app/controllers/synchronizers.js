@@ -186,6 +186,513 @@ exports.getAll = async (req, res, next) => {
 	}
 };
 
+//GET-ALL-FE Get all FE synchronizers of the local Centre
+// For all authenticated users
+exports.getAllFE = async (req, res, next) => {
+	let synchronizers = [];
+	
+	let collectionList;
+	let timeout;
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [1]  //Get only FE services from synch list
+				}
+			}
+		});
+
+		let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
+		for (const service of services) {
+			let synchList = [];
+			
+			let source = axios.CancelToken.source();
+			timeout = setTimeout(() => {
+				source.cancel();
+				wlogger.error("No response received from Service " + service.service_url); 
+				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+			}, requestTimeout);
+			const synch = await axios({
+				method: 'get',
+				url: urljoin(service.service_url, synchUrl),
+				auth: {
+					username: service.username,
+					password: Utilcrypto.decrypt(service.password)
+				},
+				validateStatus: false,
+				cancelToken: source.token
+			  }).catch(err => {
+				if (err.response) {
+				  // client received an error response (5xx, 4xx)
+				  wlogger.error("Received error response from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else if (err.request) {
+				  // client never received a response, or request never left
+				  wlogger.error("No response received from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else {
+				  // anything else
+				  wlogger.error("Error from Service " + service.service_url); 
+				  wlogger.error(err);
+				}
+			});
+			// Clear The Timeout
+			clearTimeout(timeout);
+			if(synch && synch.status == 200 && synch.data){
+
+				wlogger.debug(synch.data.d.results); 
+				for (const element of synch.data.d.results) {
+					const source = axios.CancelToken.source();
+					timeout = setTimeout(() => {
+						source.cancel();
+						wlogger.error("No response received from Service while getting targetcollection info " + service.service_url); 
+						wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+					}, requestTimeout);
+					const tc = await axios({
+						method: 'get',
+						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						auth: {
+							username: service.username,
+							password: Utilcrypto.decrypt(service.password)
+						},
+						validateStatus: false,
+						cancelToken: source.token
+					  }).catch(err => {
+						if (err.response) {
+						  // client received an error response (5xx, 4xx)
+						  wlogger.error("Received error response while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						} else if (err.request) {
+						  // client never received a response, or request never left
+						  wlogger.error("No response received while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						} else {
+						  // anything else
+						  wlogger.error("Error while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						}
+					});
+					// Clear The Timeout
+					clearTimeout(timeout);
+					if(tc && tc.status == 200 && tc.data && tc.data.d){
+						wlogger.debug("targetcollection for synch " + element.Id);
+						wlogger.debug(tc.data);
+						element.TargetCollectionName = tc.data.d.Name;
+
+					}
+
+					synchList.push(element);
+				
+				} 
+				wlogger.debug("FE Synchronizers list for service " + service.service_url);
+				wlogger.debug(synchList);
+			}
+			source = axios.CancelToken.source();
+			timeout = setTimeout(() => {
+				source.cancel();
+				wlogger.error("No response received from Service while getting collection list" + service.service_url); 
+				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+			}, requestTimeout);
+			const collections = await axios({
+				method: 'get',
+				url: urljoin(service.service_url, collectionsUrl),
+				auth: {
+					username: service.username,
+					password: Utilcrypto.decrypt(service.password)
+				},
+				validateStatus: false,
+				cancelToken: source.token
+			  }).catch(err => {
+				if (err.response) {
+				  // client received an error response (5xx, 4xx)
+				  wlogger.error("Received error response while getting collection list from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else if (err.request) {
+				  // client never received a response, or request never left
+				  wlogger.error("No response received while getting collection list from  Service " + service.service_url); 
+				  wlogger.error(err);
+				} else {
+				  // anything else
+				  wlogger.error("Error while getting collection list from Service " + service.service_url); 
+				  wlogger.error(err);
+				}
+			});
+			// Clear The Timeout
+			clearTimeout(timeout);
+			if(collections && collections.status == 200 && collections.data){
+				
+				collectionList= collections.data.value;
+
+				 
+				wlogger.debug("Collections list for service " + service.service_url);
+				wlogger.debug(collectionList);
+			}
+			let synchObj = {};
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+            wlogger.debug("Synchronizers - Product Sources HTTP response");
+            if (sources && sources.status == 404) {
+				synchObj.intelligentSyncSupported = false;
+			} else {
+				synchObj.intelligentSyncSupported = true;
+			}			
+			synchObj.serviceUrl = service.service_url;
+			synchObj.synchronizers = synchList;
+			synchObj.collections = collectionList;
+			synchronizers.push(synchObj);
+		}
+		wlogger.info({ "OK getAllFE Synchronizers:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//GET-ALL-BE Get all BE synchronizers of the local Centre
+// For all authenticated users
+exports.getAllBE = async (req, res, next) => {
+	let synchronizers = [];
+	
+	let collectionList;
+	let timeout;
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [2]  //Get only BE services from synch list
+				}
+			}
+		});
+
+		let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
+		for (const service of services) {
+			let synchList = [];
+			
+			let source = axios.CancelToken.source();
+			timeout = setTimeout(() => {
+				source.cancel();
+				wlogger.error("No response received from Service " + service.service_url); 
+				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+			}, requestTimeout);
+			const synch = await axios({
+				method: 'get',
+				url: urljoin(service.service_url, synchUrl),
+				auth: {
+					username: service.username,
+					password: Utilcrypto.decrypt(service.password)
+				},
+				validateStatus: false,
+				cancelToken: source.token
+			  }).catch(err => {
+				if (err.response) {
+				  // client received an error response (5xx, 4xx)
+				  wlogger.error("Received error response from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else if (err.request) {
+				  // client never received a response, or request never left
+				  wlogger.error("No response received from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else {
+				  // anything else
+				  wlogger.error("Error from Service " + service.service_url); 
+				  wlogger.error(err);
+				}
+			});
+			// Clear The Timeout
+			clearTimeout(timeout);
+			if(synch && synch.status == 200 && synch.data){
+
+				wlogger.debug(synch.data.d.results); 
+				for (const element of synch.data.d.results) {
+					const source = axios.CancelToken.source();
+					timeout = setTimeout(() => {
+						source.cancel();
+						wlogger.error("No response received from Service while getting targetcollection info " + service.service_url); 
+						wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+					}, requestTimeout);
+					const tc = await axios({
+						method: 'get',
+						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						auth: {
+							username: service.username,
+							password: Utilcrypto.decrypt(service.password)
+						},
+						validateStatus: false,
+						cancelToken: source.token
+					  }).catch(err => {
+						if (err.response) {
+						  // client received an error response (5xx, 4xx)
+						  wlogger.error("Received error response while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						} else if (err.request) {
+						  // client never received a response, or request never left
+						  wlogger.error("No response received while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						} else {
+						  // anything else
+						  wlogger.error("Error while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						}
+					});
+					// Clear The Timeout
+					clearTimeout(timeout);
+					if(tc && tc.status == 200 && tc.data && tc.data.d){
+						wlogger.debug("targetcollection for synch " + element.Id);
+						wlogger.debug(tc.data);
+						element.TargetCollectionName = tc.data.d.Name;
+
+					}
+
+					synchList.push(element);
+				
+				} 
+				wlogger.debug("BE Synchronizers list for service " + service.service_url);
+				wlogger.debug(synchList);
+			}
+			source = axios.CancelToken.source();
+			timeout = setTimeout(() => {
+				source.cancel();
+				wlogger.error("No response received from Service while getting collection list" + service.service_url); 
+				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+			}, requestTimeout);
+			const collections = await axios({
+				method: 'get',
+				url: urljoin(service.service_url, collectionsUrl),
+				auth: {
+					username: service.username,
+					password: Utilcrypto.decrypt(service.password)
+				},
+				validateStatus: false,
+				cancelToken: source.token
+			  }).catch(err => {
+				if (err.response) {
+				  // client received an error response (5xx, 4xx)
+				  wlogger.error("Received error response while getting collection list from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else if (err.request) {
+				  // client never received a response, or request never left
+				  wlogger.error("No response received while getting collection list from  Service " + service.service_url); 
+				  wlogger.error(err);
+				} else {
+				  // anything else
+				  wlogger.error("Error  while getting collection list from Service " + service.service_url); 
+				  wlogger.error(err);
+				}
+			});
+			// Clear The Timeout
+			clearTimeout(timeout);
+			if(collections && collections.status == 200 && collections.data){
+				
+				collectionList= collections.data.value;
+
+				 
+				wlogger.debug("Collections list for service " + service.service_url);
+				wlogger.debug(collectionList);
+			}
+			let synchObj = {};
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+            wlogger.debug("Synchronizers - Product Sources HTTP response");
+            if (sources && sources.status == 404) {
+				synchObj.intelligentSyncSupported = false;
+			} else {
+				synchObj.intelligentSyncSupported = true;
+			}			
+			synchObj.serviceUrl = service.service_url;
+			synchObj.synchronizers = synchList;
+			synchObj.collections = collectionList;
+			synchronizers.push(synchObj);
+		}
+		wlogger.info({ "OK getAllBE Synchronizers:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//GET-ALL-SI Get all SI synchronizers of the local Centre
+// For all authenticated users
+exports.getAllSI = async (req, res, next) => {
+	let synchronizers = [];
+	
+	let collectionList;
+	let timeout;
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [3]  //Get only SI services from synch list
+				}
+			}
+		});
+
+		let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
+		for (const service of services) {
+			let synchList = [];
+			
+			let source = axios.CancelToken.source();
+			timeout = setTimeout(() => {
+				source.cancel();
+				wlogger.error("No response received from Service " + service.service_url); 
+				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+			}, requestTimeout);
+			const synch = await axios({
+				method: 'get',
+				url: urljoin(service.service_url, synchUrl),
+				auth: {
+					username: service.username,
+					password: Utilcrypto.decrypt(service.password)
+				},
+				validateStatus: false,
+				cancelToken: source.token
+			  }).catch(err => {
+				if (err.response) {
+				  // client received an error response (5xx, 4xx)
+				  wlogger.error("Received error response from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else if (err.request) {
+				  // client never received a response, or request never left
+				  wlogger.error("No response received from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else {
+				  // anything else
+				  wlogger.error("Error from Service " + service.service_url); 
+				  wlogger.error(err);
+				}
+			});
+			// Clear The Timeout
+			clearTimeout(timeout);
+			if(synch && synch.status == 200 && synch.data){
+
+				wlogger.debug(synch.data.d.results); 
+				for (const element of synch.data.d.results) {
+					const source = axios.CancelToken.source();
+					timeout = setTimeout(() => {
+						source.cancel();
+						wlogger.error("No response received from Service while getting targetcollection info " + service.service_url); 
+						wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+					}, requestTimeout);
+					const tc = await axios({
+						method: 'get',
+						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						auth: {
+							username: service.username,
+							password: Utilcrypto.decrypt(service.password)
+						},
+						validateStatus: false,
+						cancelToken: source.token
+					  }).catch(err => {
+						if (err.response) {
+						  // client received an error response (5xx, 4xx)
+						  wlogger.error("Received error response while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						} else if (err.request) {
+						  // client never received a response, or request never left
+						  wlogger.error("No response received while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						} else {
+						  // anything else
+						  wlogger.error("Error while getting targetcollection info from Service " + service.service_url); 
+						  wlogger.error(err);
+						}
+					});
+					// Clear The Timeout
+					clearTimeout(timeout);
+					if(tc && tc.status == 200 && tc.data && tc.data.d){
+						wlogger.debug("targetcollection for synch " + element.Id);
+						wlogger.debug(tc.data);
+						element.TargetCollectionName = tc.data.d.Name;
+
+					}
+
+					synchList.push(element);
+				
+				} 
+				wlogger.debug("SI Synchronizers list for service " + service.service_url);
+				wlogger.debug(synchList);
+			}
+			source = axios.CancelToken.source();
+			timeout = setTimeout(() => {
+				source.cancel();
+				wlogger.error("No response received from Service while getting collection list" + service.service_url); 
+				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
+			}, requestTimeout);
+			const collections = await axios({
+				method: 'get',
+				url: urljoin(service.service_url, collectionsUrl),
+				auth: {
+					username: service.username,
+					password: Utilcrypto.decrypt(service.password)
+				},
+				validateStatus: false,
+				cancelToken: source.token
+			  }).catch(err => {
+				if (err.response) {
+				  // client received an error response (5xx, 4xx)
+				  wlogger.error("Received error response while getting collection list from Service " + service.service_url); 
+				  wlogger.error(err);
+				} else if (err.request) {
+				  // client never received a response, or request never left
+				  wlogger.error("No response received while getting collection list from  Service " + service.service_url); 
+				  wlogger.error(err);
+				} else {
+				  // anything else
+				  wlogger.error("Error  while getting collection list from Service " + service.service_url); 
+				  wlogger.error(err);
+				}
+			});
+			// Clear The Timeout
+			clearTimeout(timeout);
+			if(collections && collections.status == 200 && collections.data){
+				
+				collectionList= collections.data.value;
+
+				 
+				wlogger.debug("Collections list for service " + service.service_url);
+				wlogger.debug(collectionList);
+			}
+			let synchObj = {};
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+            wlogger.debug("Synchronizers - Product Sources HTTP response");
+            if (sources && sources.status == 404) {
+				synchObj.intelligentSyncSupported = false;
+			} else {
+				synchObj.intelligentSyncSupported = true;
+			}			
+			synchObj.serviceUrl = service.service_url;
+			synchObj.synchronizers = synchList;
+			synchObj.collections = collectionList;
+			synchronizers.push(synchObj);
+		}
+		wlogger.info({ "OK getAllSI Synchronizers:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
 /** [POST] /synchronizers
  * 	Create ONE  - For admin only
  *
