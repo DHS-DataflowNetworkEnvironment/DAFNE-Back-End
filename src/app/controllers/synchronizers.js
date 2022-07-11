@@ -203,7 +203,7 @@ exports.getAllFE = async (req, res, next) => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [1]  //Get only FE services from synch list
+					[Sequelize.Op.in]: [2]  //Get only FE services from synch list
 				}
 			}
 		});
@@ -372,7 +372,7 @@ exports.getAllBE = async (req, res, next) => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [2]  //Get only BE services from synch list
+					[Sequelize.Op.in]: [3]  //Get only BE services from synch list
 				}
 			}
 		});
@@ -541,7 +541,7 @@ exports.getAllSI = async (req, res, next) => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [3]  //Get only SI services from synch list
+					[Sequelize.Op.in]: [1]  //Get only SI services from synch list
 				}
 			}
 		});
