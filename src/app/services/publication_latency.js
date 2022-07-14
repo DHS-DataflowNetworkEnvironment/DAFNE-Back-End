@@ -97,7 +97,7 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
             
             if(beProducts && beProducts.status == 200 && beProducts.data && beProducts.data.value && beProducts.data.value.length > 0) { 
                 beProduct =  beProducts.data.value[0];
-                wlogger.info(`Found product ${beProduct.Name} - ${beProduct.Id} on llocal BE ${service.service_url} with CreationDate ${beProduct.CreationDate}.`);
+                wlogger.info(`Found product ${beProduct.Name} - ${beProduct.Id} on local BE ${service.service_url} with CreationDate ${beProduct.CreationDate}.`);
                 //retrieve product on FE
                 if(feService) {
                     
