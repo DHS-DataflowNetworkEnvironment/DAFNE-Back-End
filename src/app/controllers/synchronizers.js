@@ -166,8 +166,8 @@ exports.getAll = async (req, res, next) => {
 			}
 			let synchObj = {};
 			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
-            wlogger.debug("Synchronizers - Product Sources HTTP response");
-            if (sources && sources.status == 404) {
+			wlogger.debug("Synchronizers - Product Sources HTTP response");
+			if (sources && sources.status == 404) {
 				synchObj.intelligentSyncSupported = false;
 			} else {
 				synchObj.intelligentSyncSupported = true;
@@ -1045,6 +1045,7 @@ exports.getAllV2 = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.d.results;
 					synchronizers.push(synchObj); 				
@@ -1053,6 +1054,7 @@ exports.getAllV2 = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.value;
 					synchronizers.push(synchObj); 				
@@ -1095,6 +1097,7 @@ exports.getAllV2FE = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.d.results;
 					synchronizers.push(synchObj); 				
@@ -1103,6 +1106,7 @@ exports.getAllV2FE = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.value;
 					synchronizers.push(synchObj); 				
@@ -1145,6 +1149,7 @@ exports.getAllV2BE = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.d.results;
 					synchronizers.push(synchObj); 				
@@ -1153,6 +1158,7 @@ exports.getAllV2BE = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.value;
 					synchronizers.push(synchObj); 				
@@ -1195,6 +1201,7 @@ exports.getAllV2SI = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.d.results;
 					synchronizers.push(synchObj); 				
@@ -1203,6 +1210,7 @@ exports.getAllV2SI = async (req, res, next) => {
 				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
 				if(synchList && synchList.status == 200 && synchList.data ) {
 					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
 					synchObj.serviceUrl = service.service_url;
 					synchObj.synchronizers = synchList.data.value;
 					synchronizers.push(synchObj); 				
