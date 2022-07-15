@@ -733,7 +733,6 @@ exports.computeAvailability = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
-		console.log("Daily Availability List: " + JSON.stringify(itemList, null, 2));
 		availability.values = itemList;
 		wlogger.debug("Daily Service Availability:");
 		wlogger.debug(availability)
