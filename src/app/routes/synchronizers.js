@@ -27,4 +27,13 @@ router.delete('/:id', isAuth, isAdmin, controller.deleteOne);
 //READ ALL Synchronizers V2-> [GET] ../synchronizers/v2
 router.get('/v2', isAuth, controller.getAllV2);
 
+//READ ALL FE Synchronizers V2-> [GET] ../synchronizers/v2fe
+router.get('/v2fe', isAuth, controller.getAllV2FE);
+
+//READ ALL BE Synchronizers V2-> [GET] ../synchronizers/v2be
+router.get('/v2be', isAuth, controller.getAllV2BE);
+
+//READ ALL SI Synchronizers V2-> [GET] ../synchronizers/v2si
+router.get('/v2si', isAuth, controller.getAllV2SI);
+
 module.exports = router;

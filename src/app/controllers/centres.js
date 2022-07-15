@@ -704,7 +704,7 @@ getFakeDataSourcesInfo = () => {
 exports.computeAvailability = async (req, res, next) => {
 	let availability = {};
 	//let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY day) x ORDER BY day";
-	let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT avg(count/total::float)*100 FROM (SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day) z ) average FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day ) x ORDER BY day";
+	let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT SUM(COUNT::float) / SUM(TOTAL::float)*100 FROM (SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day) z ) average FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day ) x ORDER BY day";
 	wlogger.info("computeAvailability: [GET] /centres/:id/service/availability");
 	try {
 		if (isNaN(req.params.id)) {
@@ -810,6 +810,7 @@ exports.computeAvailabilityWeekly = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
+		console.log("Weekly Availability List: " + JSON.stringify(itemList, null, 2));
 		availability.values = itemList;
 		wlogger.debug("Weekly Service Availability:");
 		wlogger.debug(availability)

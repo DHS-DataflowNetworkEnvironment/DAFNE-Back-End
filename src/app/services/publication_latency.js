@@ -97,7 +97,7 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
             
             if(beProducts && beProducts.status == 200 && beProducts.data && beProducts.data.value && beProducts.data.value.length > 0) { 
                 beProduct =  beProducts.data.value[0];
-                wlogger.info(`Found product ${beProduct.Name} - ${beProduct.Id} on llocal BE ${service.service_url} with CreationDate ${beProduct.CreationDate}.`);
+                wlogger.info(`Found product ${beProduct.Name} - ${beProduct.Id} on local BE ${service.service_url} with CreationDate ${beProduct.CreationDate}.`);
                 //retrieve product on FE
                 if(feService) {
                     
@@ -267,28 +267,30 @@ checkPublicationLatency = async () => {
                                     
 
                                 } else {
+                                    let requestFilter;
+                                    //Retrieve synchronizer LastCreationDate
+                                    const lastCreationDate = moment(element.LastCreationDate).utc().format('YYYY-MM-DDTHH:mm:ss.SSS')+'Z';
+                                    const lastCreationDateMin = moment(element.LastCreationDate).utc().subtract(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
+                                    const lastCreationDateMax = moment(element.LastCreationDate).utc().add(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
                                     if(element.FilterParam) {
-                                        //Retrieve synchronizer LastCreationDate
-                                        const lastCreationDate = moment(element.LastCreationDate).utc().format('YYYY-MM-DDTHH:mm:ss.SSS')+'Z';
-                                        const lastCreationDateMin = moment(element.LastCreationDate).utc().subtract(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
-                                        const lastCreationDateMax = moment(element.LastCreationDate).utc().add(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
-                                        wlogger.info(`Finding on Referenced Source ${sourceService.service_url} the last synchronized product from Synch with Id = ${element.Id}, Label = ${element.Label},    
-                                        sourceUrl =${sourceUrl}, FilterParam = ${element.FilterParam}, LastCreationDate = ${element.LastCreationDate}`);
-                                        wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${latencyTolerance} second(s), with a Creation Date   
-                                        between ${lastCreationDateMin} and ${lastCreationDateMax}`);
-                                        let requestFilter = `${element.FilterParam } and CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
-                                        let productUrlByFilterParam = searchProductByFilter;
-                                        productUrlByFilterParam = productUrlByFilterParam.replace(':filter',requestFilter);
-                                        wlogger.info(`Request to perform on Referenced Source  ${sourceService.service_url} is ${productUrlByFilterParam}`);
-                                        //retrieve product in the Referenced Source
-                                        const sourceProducts = await utility.performDHuSServiceRequest(sourceService, productUrlByFilterParam);
-                                        //compute Latency
-                                        await manageLatency(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
-                                            productUrlByFilterParam, currentTimestamp);
+                                        requestFilter = `${element.FilterParam } and CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
                                     } else {
-                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Cannot compute the publication latency.`);
+                                        requestFilter = `CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
+                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Compute the publication latency based only on CreationDate`);
                                     }
-                                       
+                                    wlogger.info(`Finding on Referenced Source ${sourceService.service_url} the last synchronized product from Synch with Id = ${element.Id}, Label = ${element.Label},    
+                                    sourceUrl =${sourceUrl}, FilterParam = ${element.FilterParam}, LastCreationDate = ${element.LastCreationDate}`);
+                                    wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${latencyTolerance} second(s), with a Creation Date   
+                                    between ${lastCreationDateMin} and ${lastCreationDateMax}`);
+                                    
+                                    let productUrlByFilterParam = searchProductByFilter;
+                                    productUrlByFilterParam = productUrlByFilterParam.replace(':filter',requestFilter);
+                                    wlogger.info(`Request to perform on Referenced Source  ${sourceService.service_url} is ${productUrlByFilterParam}`);
+                                    //retrieve product in the Referenced Source
+                                    const sourceProducts = await utility.performDHuSServiceRequest(sourceService, productUrlByFilterParam);
+                                    //compute Latency
+                                    await manageLatency(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
+                                        productUrlByFilterParam, currentTimestamp);                                       
                                 }
                             } catch (e) {
                                 wlogger.error(`Error occurred while retrieving publication latency measure on local BE ${service.service_url}`);
@@ -325,27 +327,30 @@ checkPublicationLatency = async () => {
                                     // TODO: insert N/A measure in the DAFNE DB
 
                                 } else {
+                                    let requestFilter;
+                                    //Retrieve synchronizer LastCreationDate
+                                    const lastCreationDate = moment(rs.LastCreationDate).utc().format('YYYY-MM-DDTHH:mm:ss.SSS')+'Z';
+                                    const lastCreationDateMin = moment(rs.LastCreationDate).utc().subtract(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
+                                    const lastCreationDateMax = moment(rs.LastCreationDate).utc().add(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
                                     if (element.FilterParam) {
-                                        //Retrieve synchronizer LastCreationDate
-                                        const lastCreationDate = moment(rs.LastCreationDate).utc().format('YYYY-MM-DDTHH:mm:ss.SSS')+'Z';
-                                        const lastCreationDateMin = moment(rs.LastCreationDate).utc().subtract(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
-                                        const lastCreationDateMax = moment(rs.LastCreationDate).utc().add(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
-                                        wlogger.info(`Finding on Referenced Source ${sourceService.service_url} the last synchronized product from Synch with Id = ${element.Id}, Label = ${element.Label},    
-                                        sourceUrl =${sourceUrl}, FilterParam = ${element.FilterParam}, LastCreationDate = ${element.LastCreationDate}`);
-                                        wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${latencyTolerance} second(s), with a Creation Date   
-                                        between ${lastCreationDateMin} and ${lastCreationDateMax}`);
-                                        let requestFilter = `${element.FilterParam } and CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
-                                        let productUrlByFilterParam = searchProductByFilter;
-                                        productUrlByFilterParam = productUrlByFilterParam.replace(':filter',requestFilter);
-                                        wlogger.info(`Request to perform on Referenced Source ${sourceService.service_url} is ${productUrlByFilterParam}`);
-                                        //retrieve product in the Reference Source
-                                        const sourceProducts = await utility.performDHuSServiceRequest(sourceService, productUrlByFilterParam);
-                                        //compute Latency
-                                        await manageLatency(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
-                                            productUrlByFilterParam, currentTimestamp);
+                                        requestFilter = `${element.FilterParam } and CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
                                     } else {
-                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Cannot compute the publication latency.`);
+                                        requestFilter = `CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
+                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Compute the publication latency based only on CreationDate`);
                                     }
+                                    wlogger.info(`Finding on Referenced Source ${sourceService.service_url} the last synchronized product from Synch with Id = ${element.Id}, Label = ${element.Label},    
+                                    sourceUrl =${sourceUrl}, FilterParam = ${element.FilterParam}, LastCreationDate = ${lastCreationDate}`);
+                                    wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${latencyTolerance} second(s), with a Creation Date   
+                                    between ${lastCreationDateMin} and ${lastCreationDateMax}`);
+                                    
+                                    let productUrlByFilterParam = searchProductByFilter;
+                                    productUrlByFilterParam = productUrlByFilterParam.replace(':filter',requestFilter);
+                                    wlogger.info(`Request to perform on Referenced Source ${sourceService.service_url} is ${productUrlByFilterParam}`);
+                                    //retrieve product in the Reference Source
+                                    const sourceProducts = await utility.performDHuSServiceRequest(sourceService, productUrlByFilterParam);
+                                    //compute Latency
+                                    await manageLatency(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
+                                        productUrlByFilterParam, currentTimestamp);
                                 }
                             } catch (e) {
                                 wlogger.error(`Error occurred while retrieving publication latency measure on local BE ${service.service_url}`);

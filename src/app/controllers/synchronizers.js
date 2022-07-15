@@ -166,8 +166,8 @@ exports.getAll = async (req, res, next) => {
 			}
 			let synchObj = {};
 			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
-            wlogger.debug("Synchronizers - Product Sources HTTP response");
-            if (sources && sources.status == 404) {
+			wlogger.debug("Synchronizers - Product Sources HTTP response");
+			if (sources && sources.status == 404) {
 				synchObj.intelligentSyncSupported = false;
 			} else {
 				synchObj.intelligentSyncSupported = true;
@@ -186,7 +186,7 @@ exports.getAll = async (req, res, next) => {
 	}
 };
 
-//GET-ALL Get all FE synchronizers of the local Centre
+//GET-ALL-FE Get all FE synchronizers of the local Centre
 // For all authenticated users
 exports.getAllFE = async (req, res, next) => {
 	let synchronizers = [];
@@ -203,7 +203,7 @@ exports.getAllFE = async (req, res, next) => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [2]  //Take only FE services from synch list
+					[Sequelize.Op.in]: [2]  //Get only FE services from synch list
 				}
 			}
 		});
@@ -319,7 +319,7 @@ exports.getAllFE = async (req, res, next) => {
 				  wlogger.error(err);
 				} else {
 				  // anything else
-				  wlogger.error("Error  while getting collection list from Service " + service.service_url); 
+				  wlogger.error("Error while getting collection list from Service " + service.service_url); 
 				  wlogger.error(err);
 				}
 			});
@@ -355,7 +355,7 @@ exports.getAllFE = async (req, res, next) => {
 	}
 };
 
-//GET-ALL Get all BE synchronizers of the local Centre
+//GET-ALL-BE Get all BE synchronizers of the local Centre
 // For all authenticated users
 exports.getAllBE = async (req, res, next) => {
 	let synchronizers = [];
@@ -372,7 +372,7 @@ exports.getAllBE = async (req, res, next) => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [3]  //Take only BE services from synch list
+					[Sequelize.Op.in]: [3]  //Get only BE services from synch list
 				}
 			}
 		});
@@ -459,7 +459,7 @@ exports.getAllBE = async (req, res, next) => {
 					synchList.push(element);
 				
 				} 
-				wlogger.debug("Synchronizers BE list for service " + service.service_url);
+				wlogger.debug("BE Synchronizers list for service " + service.service_url);
 				wlogger.debug(synchList);
 			}
 			source = axios.CancelToken.source();
@@ -515,7 +515,7 @@ exports.getAllBE = async (req, res, next) => {
 			synchObj.collections = collectionList;
 			synchronizers.push(synchObj);
 		}
-		wlogger.info({ "OK getAll Synchronizers:": synchronizers });
+		wlogger.info({ "OK getAllBE Synchronizers:": synchronizers });
 		
 		return res.status(200).json(synchronizers);
 	} catch (error) {
@@ -524,7 +524,7 @@ exports.getAllBE = async (req, res, next) => {
 	}
 };
 
-//GET-ALL Get all SI synchronizers of the local Centre
+//GET-ALL-SI Get all SI synchronizers of the local Centre
 // For all authenticated users
 exports.getAllSI = async (req, res, next) => {
 	let synchronizers = [];
@@ -541,7 +541,7 @@ exports.getAllSI = async (req, res, next) => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [1]  //Take only SI services from synch list
+					[Sequelize.Op.in]: [1]  //Get only SI services from synch list
 				}
 			}
 		});
@@ -628,7 +628,7 @@ exports.getAllSI = async (req, res, next) => {
 					synchList.push(element);
 				
 				} 
-				wlogger.debug("Synchronizers SI list for service " + service.service_url);
+				wlogger.debug("SI Synchronizers list for service " + service.service_url);
 				wlogger.debug(synchList);
 			}
 			source = axios.CancelToken.source();
@@ -684,7 +684,7 @@ exports.getAllSI = async (req, res, next) => {
 			synchObj.collections = collectionList;
 			synchronizers.push(synchObj);
 		}
-		wlogger.info({ "OK getAll Synchronizers:": synchronizers });
+		wlogger.info({ "OK getAllSI Synchronizers:": synchronizers });
 		
 		return res.status(200).json(synchronizers);
 	} catch (error) {
@@ -1039,16 +1039,185 @@ exports.getAllV2 = async (req, res, next) => {
 		});
 		
 		for (const service of services) {
-			
-			const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
-			if(synchList && synchList.status == 200 && synchList.data ) {
-				let synchObj = {};
-				synchObj.serviceUrl = service.service_url;
-				synchObj.synchronizers = synchList.data.value;
-				synchronizers.push(synchObj); 				
-			} 			
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+      wlogger.debug("Synchronizers - Product Sources HTTP response");
+      if (sources && sources.status == 404) {
+				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.d.results;
+					synchronizers.push(synchObj); 				
+				} 
+			} else {
+				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.value;
+					synchronizers.push(synchObj); 				
+				} 
+			}						
 		}
 		wlogger.info({ "OK getAll Synchronizers V2:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//GET-ALL Get all FE synchronizers v2 of the local Centre
+// For all authenticated users
+exports.getAllV2FE = async (req, res, next) => {
+	let synchronizers = [];
+		
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [2]   //Take only FE services from synch list
+				}
+			}
+		});
+		
+		for (const service of services) {
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+      wlogger.debug("Synchronizers - Product Sources HTTP response");
+      if (sources && sources.status == 404) {
+				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.d.results;
+					synchronizers.push(synchObj); 				
+				} 
+			} else {
+				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.value;
+					synchronizers.push(synchObj); 				
+				} 
+			}						
+		}
+		wlogger.info({ "OK getAll FE Synchronizers V2:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//GET-ALL Get all BE synchronizers v2 of the local Centre
+// For all authenticated users
+exports.getAllV2BE = async (req, res, next) => {
+	let synchronizers = [];
+		
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [3]   //Take only BE services from synch list
+				}
+			}
+		});
+		
+		for (const service of services) {
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+      wlogger.debug("Synchronizers - Product Sources HTTP response");
+      if (sources && sources.status == 404) {
+				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.d.results;
+					synchronizers.push(synchObj); 				
+				} 
+			} else {
+				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.value;
+					synchronizers.push(synchObj); 				
+				} 
+			}						
+		}
+		wlogger.info({ "OK getAll FE Synchronizers V2:": synchronizers });
+		
+		return res.status(200).json(synchronizers);
+	} catch (error) {
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+};
+
+//GET-ALL Get all SI synchronizers v2 of the local Centre
+// For all authenticated users
+exports.getAllV2SI = async (req, res, next) => {
+	let synchronizers = [];
+		
+	try {
+		const centre = await Centre.findOne({
+			where: {
+				local: true
+			}
+		});
+		const services = await Service.findAll({
+			where: {
+				centre: centre.id,
+				service_type: {
+					[Sequelize.Op.in]: [1]   //Take only SI services from synch list
+				}
+			}
+		});
+		
+		for (const service of services) {
+			const sources = await utility.performDHuSServiceRequest(service, getProductSourcesUrl);
+      wlogger.debug("Synchronizers - Product Sources HTTP response");
+      if (sources && sources.status == 404) {
+				const synchList = await utility.performDHuSServiceRequest(service, synchUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = false;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.d.results;
+					synchronizers.push(synchObj); 				
+				} 
+			} else {
+				const synchList = await utility.performDHuSServiceRequest(service, getSynchronizersUrl);
+				if(synchList && synchList.status == 200 && synchList.data ) {
+					let synchObj = {};
+					synchObj.intelligentSyncSupported = true;
+					synchObj.serviceUrl = service.service_url;
+					synchObj.synchronizers = synchList.data.value;
+					synchronizers.push(synchObj); 				
+				} 
+			}						
+		}
+		wlogger.info({ "OK getAll FE Synchronizers V2:": synchronizers });
 		
 		return res.status(200).json(synchronizers);
 	} catch (error) {
