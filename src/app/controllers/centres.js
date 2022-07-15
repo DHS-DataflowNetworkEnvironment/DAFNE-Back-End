@@ -810,7 +810,6 @@ exports.computeAvailabilityWeekly = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
-		console.log("Weekly Availability List: " + JSON.stringify(itemList, null, 2));
 		availability.values = itemList;
 		wlogger.debug("Weekly Service Availability:");
 		wlogger.debug(availability)
