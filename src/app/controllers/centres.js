@@ -556,8 +556,7 @@ getFakeDataSourcesInfo = () => {
 			wlogger.debug("service.centre: " + service.centre);
 			wlogger.debug("req.params.id: " + req.params.id);
 			// get the list of service_url intersecting the configured services of a center (excluding the source centre)
-			if(service.centre != req.params.id && service.service_type != 2 ) { //Exclude FE services and local services from the list 
-				
+			if(service.centre != req.params.id && service.service_type != 2 && service.service_type < 4 ) { //Exclude FE services, DAS Services and local services from the list 
 				// Check if DHuS service support Intelligent Synchronizers by performing request to ProductSources entity
 				const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 				wlogger.debug("Product Sources HTTP response");
@@ -617,7 +616,7 @@ getFakeDataSourcesInfo = () => {
 					wlogger.info("Failed to retrieve sources and synch list for service " + service.service_url)
 				}
 				
-			} else if (service.centre == req.params.id && service.service_type != 3) {  // get local services (excluding BE services)
+			} else if (service.centre == req.params.id && service.service_type != 3 && service.service_type < 4) {  // get local services (excluding BE services and DAS services)
 				if (service.service_url.lastIndexOf('/') == service.service_url.length -1) {
 					centreServices.push(service.service_url.slice(0, -1));
 				} else {
@@ -810,7 +809,6 @@ exports.computeAvailabilityWeekly = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
-		console.log("Weekly Availability List: " + JSON.stringify(itemList, null, 2));
 		availability.values = itemList;
 		wlogger.debug("Weekly Service Availability:");
 		wlogger.debug(availability)
