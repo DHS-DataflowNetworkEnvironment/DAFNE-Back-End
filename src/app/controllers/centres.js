@@ -286,7 +286,7 @@ getFakeDataSourcesInfo = () => {
 			//console.log(sources);
 			// Get info from odata/v1 synchronizers
 			if (sources && sources.status == 404) {
-				wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
+				wlogger.info("Get Data Sources Info: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
 				const synch = await utility.performDHuSServiceRequest(service, synchUrl);
 				if(synch && synch.status == 200 && synch.data){
 
@@ -430,7 +430,7 @@ getFakeDataSourcesInfo = () => {
 				//console.log(sources);
 				// Get info from odata/v1 synchronizers
 				if (sources && sources.status == 404) {
-					wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
+					wlogger.info("Get Map Data Sources Info: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
 					const synch = await utility.performDHuSServiceRequest(service, selectSynchUrl);
 					if(synch && synch.status == 200 && synch.data){
 
@@ -556,15 +556,14 @@ getFakeDataSourcesInfo = () => {
 			wlogger.debug("service.centre: " + service.centre);
 			wlogger.debug("req.params.id: " + req.params.id);
 			// get the list of service_url intersecting the configured services of a center (excluding the source centre)
-			if(service.centre != req.params.id && service.service_type != 2 ) { //Exclude FE services and local services from the list 
-				
+			if(service.centre != req.params.id && service.service_type != 2 && service.service_type < 4 ) { //Exclude FE services, DAS Services and local services from the list 
 				// Check if DHuS service support Intelligent Synchronizers by performing request to ProductSources entity
 				const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 				wlogger.debug("Product Sources HTTP response");
 				//console.log(sources);
 				// Get info from odata/v1 synchronizers
 				if (sources && sources.status == 404) {
-					wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
+					wlogger.info("Get DHS Connected: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
 					const synch = await utility.performDHuSServiceRequest(service, selectSynchUrl);
 					if(synch && synch.status == 200 && synch.data){
 
@@ -617,7 +616,7 @@ getFakeDataSourcesInfo = () => {
 					wlogger.info("Failed to retrieve sources and synch list for service " + service.service_url)
 				}
 				
-			} else if (service.centre == req.params.id && service.service_type != 3) {  // get local services (excluding BE services)
+			} else if (service.centre == req.params.id && service.service_type != 3 && service.service_type < 4) {  // get local services (excluding BE services and DAS services)
 				if (service.service_url.lastIndexOf('/') == service.service_url.length -1) {
 					centreServices.push(service.service_url.slice(0, -1));
 				} else {
@@ -781,7 +780,7 @@ exports.computeAvailability = async (req, res, next) => {
 exports.computeAvailabilityWeekly = async (req, res, next) => {
 	let availability = {};
 	//let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY week) x ORDER BY week";
-	let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT avg(count/total::float)*100 FROM (SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week) z ) average FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week ) x ORDER BY week";
+	let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT SUM(COUNT::float) / SUM(TOTAL::float)*100 FROM (SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week) z ) average FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week ) x ORDER BY week";
 	wlogger.info("computeAvailabilityWeekly: [GET] /centres/:id/service/availability/weekly");
 	try {
 		if (isNaN(req.params.id)) {

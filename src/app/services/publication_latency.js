@@ -247,7 +247,7 @@ checkPublicationLatency = async () => {
             //console.log(sources);
             // Get info from odata/v1 synchronizers
             if (sources && sources.status == 404) {
-                wlogger.info("Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
+                wlogger.info("Publication Latency: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
                 const synch = await utility.performDHuSServiceRequest(service, synchUrl);
                 if(synch && synch.status == 200 && synch.data){
 
