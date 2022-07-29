@@ -195,9 +195,9 @@ exports.getDatesList = (start, stop)  => {
 exports.performDHuSServiceRequest = async (service, requestUrl) => {
   const source = axios.CancelToken.source();
   let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
-  timeout = setTimeout(() => {
+  let timeout = setTimeout(() => {
     source.cancel();
-    wlogger.error("No response received from Service " + service.service_url); 
+    wlogger.error("No response received from Service " + service.service_url + " - requestURL: " + requestUrl); 
     wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
   }, requestTimeout);
   const response = await axios({

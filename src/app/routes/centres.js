@@ -34,11 +34,17 @@ router.get('/:id/map/dhsconnected', isAuth, controller.getMapDhsConnected);
 //[POST] ../centres/id/service/availability
 router.post('/:id/service/availability', isAuth, controller.computeAvailability);
 
+//[POST] ../centres/id/service/availability/weekly
+router.post('/:id/service/availability/weekly', isAuth, controller.computeAvailabilityWeekly);
+
 //[POST] ../centres/id/service/availability/average
 router.post('/:id/service/availability/average', isAuth, controller.computeAverageAvailability);
 
 //[POST] ../centres/id/service/latency/daily
 router.post('/:id/service/latency/daily', isAuth, controller.computeLatency);
+
+//[POST] ../centres/id/service/latency/weekly
+router.post('/:id/service/latency/weekly', isAuth, controller.computeLatencyWeekly);
 
 //[POST] ../centres/id/service/latency/daily/details
 router.post('/:id/service/latency/daily/details', isAuth, controller.computeLatencyDetails);
