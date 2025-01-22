@@ -1,32 +1,31 @@
 {
-    "logger": {
-	"zippedArchive": false,
-	"dateFormat": "YYYY-MM-DD HH:mm:ss,SSS",
-	"maxSize": "50m",
-	"severity": "info",
-	"logname": "dafne-be--%DATE%.log",
-	"datePattern": "YYYY-MM-DD"
-    },
-    "production": {
-    	"username": "dafne",
-    	"password": "<PWD>",
-    	"database": "dafne",
-    	"host": "localhost",
-    	"port": "5432",
-    	"dialect": "postgres",
-    	"operatorsAliases": false
-    },
+	"logger": {
+		"zippedArchive": false,
+		"dateFormat": "YYYY-MM-DD HH:mm:ss,SSS",
+		"maxSize": "50m",
+		"severity": "info",
+		"logname": "dafne-be--%DATE%.log",
+		"datePattern": "YYYY-MM-DD"
+	},
+	"production": {
+		"username": "dafne",
+		"password": "<PWD>",
+		"database": "dafne",
+		"host": "127.0.0.1",
+		"port": "5432",
+		"dialect": "postgres",
+		"operatorsAliases": 0
+	},
 	"crypto": {
 		"symmetric": {
-			"secret": "",
-			"algorithm": ""
+			"secret": "4ic1yZEnb1eL94LtdyonVvaH1mgBuxen",
+			"algorithm": "aes-256-ctr"
 		}
 	},
 	"auth": {
-		"keycloakBaseUrl": "https://<keycloak_url>/auth/realms/dhus/protocol/openid-connect",
+		"keycloakBaseUrl": "https://keycloak.alia-space.ovh/realms/DAFNE/protocol/openid-connect",
 		"clientId": "dafne",
 		"grantType": "password"
-
 	},
 	"availability": {
 		"schedule": "*/10 * * * *",
@@ -46,7 +45,7 @@
 	  },
 	"requestTimeout": 30000,
 	"dataSourceStatus": ["RUNNING", "PENDING"],
-	"version": "3.0.0",
-        "port": 2000,
+	"version": "2.0.2",
+  "port": 2000,
 	"adminRole": "DATAFLOW_MANAGER"
 }
