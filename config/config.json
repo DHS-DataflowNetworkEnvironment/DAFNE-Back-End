@@ -32,7 +32,8 @@
 		"enablePurge": true,
 		"purgeSchedule": "0 1 * * *",
 		"rollingPeriodInDays": 90,
-		"url": "odata/v1/Products?$top=1"
+		"url": "odata/v1/Products?$top=1",
+		"urlGSS": "odata/v2/Products?$top=1"
 	},
 	"latency": {
 		"schedule": "0 * * * *",

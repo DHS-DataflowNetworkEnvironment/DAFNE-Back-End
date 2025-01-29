@@ -19,7 +19,7 @@ let purgeSchedule = "0 1 * * *";
 // default availability rolling period 90 days
 let rollingPeriodInDays = 90;
 let enablePurge = true;
-
+let isGSS = false;
 let availability_endpoint = "odata/v1/Products?$top=1";
 
 checkServiceAVailability = async () => {
@@ -36,7 +36,7 @@ checkServiceAVailability = async () => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [1, 2]  //Exclude BE services from services
+					[Sequelize.Op.in]: [1, 2, 7]  //Exclude BE services from services - Added GSS(7) to the suitable services
 				}
 			},
             order: [['service_type', 'DESC']] //Order by service_type DESC to get the FE in case an FE + Single Instance configured (not a real case)
@@ -44,13 +44,24 @@ checkServiceAVailability = async () => {
 
 		let currentTimestamp = new Date().getTime();
         if(service) {
-            // check service availability for local centre
+            // check service availability for local centre            
+            if (service.service_type == 7) {
+                isGSS = true;
+            } else {
+                isGSS = false;
+            }
             let timeout;
             let description;
             let availability_url;
             try {
-                if(conf.getConfig().availability && conf.getConfig().availability.url ) {
-                    availability_endpoint = conf.getConfig().availability.url;
+                if (isGSS == true) {
+                    if(conf.getConfig().availability && conf.getConfig().availability.urlGSS ) {
+                        availability_endpoint = conf.getConfig().availability.urlGSS;
+                    }
+                 } else {
+                    if(conf.getConfig().availability && conf.getConfig().availability.url ) {
+                        availability_endpoint = conf.getConfig().availability.url;
+                    }
                 }
                 wlogger.info("Availability endpoint is; " + availability_endpoint);
                 
