@@ -89,7 +89,7 @@ exports.updateOne = async (req, res) => {
 /** [DELETE] /servicetypes/1
  *	DELETE ONE
  *
- * 	@param {string} req.params.id the service to delete
+ * 	@param {string} req.params.id the service type to delete
  *
  * 	@returns {} the 200 status code with a sequelize message if it was deleted correctly
  */

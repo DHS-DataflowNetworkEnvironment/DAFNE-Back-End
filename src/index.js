@@ -35,27 +35,12 @@ app.use('/config', require('./app/routes/config'));
 
 (async () => {
   wlogger.log({ level: 'info', message: process.env });  //Log ENVIRONMENT VARIABLES
-  wlogger.info('Trying to connect to DB...................');
 
   try {
     if (dbParams.username !== undefined) {
-      wlogger.info('dbParams.username: ' + dbParams.username);
-      wlogger.info('dbParams.host: ' + dbParams.host);
-      wlogger.info('dbParams.port: ' + dbParams.port);
-      wlogger.info('dbParams.dialect: ' + dbParams.dialect);
-
-      // test sequelize connection:
-      wlogger.info('Sequelize Auth:');
-      await sequelize.authenticate().then(() => {
-        wlogger.info('Connection has been established successfully.');
-      }).catch((error) => {
-        wlogger.error('Unable to connect to the database: ' + error);
-      });
-
       // wait till Sequelize is synchronized
       wlogger.info('Sequelize Sync:');
-      await sequelize.sync({ force: true }); // force: true recreate db every time
-      wlogger.info('Sequelize done..........');
+      await sequelize.sync({ force: false }); // force: true recreate db every time
       app.listen(config.getConfig().port);
       wlogger.info('Server READY');
       scheduleAvailability.createScheduler();

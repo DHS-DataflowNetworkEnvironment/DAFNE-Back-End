@@ -11,7 +11,7 @@
 		"username": "dafne",
 		"password": "<PWD>",
 		"database": "dafne",
-		"host": "127.0.0.1",
+		"host": "192.168.0.109",
 		"port": "5432",
 		"dialect": "postgres",
 		"operatorsAliases": 0
@@ -45,7 +45,7 @@
 	  },
 	"requestTimeout": 30000,
 	"dataSourceStatus": ["RUNNING", "PENDING"],
-	"version": "2.0.2",
+	"version": "4.0.0",
   "port": 2000,
 	"adminRole": "DATAFLOW_MANAGER"
 }
