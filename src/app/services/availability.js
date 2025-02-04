@@ -19,7 +19,6 @@ let purgeSchedule = "0 1 * * *";
 // default availability rolling period 90 days
 let rollingPeriodInDays = 90;
 let enablePurge = true;
-let isGSS = false;
 let availability_endpoint = "odata/v1/Products?$top=1";
 
 checkServiceAVailability = async () => {
@@ -44,7 +43,8 @@ checkServiceAVailability = async () => {
 
 		let currentTimestamp = new Date().getTime();
         if(service) {
-            // check service availability for local centre            
+            // check service availability for local centre   
+            let isGSS = false;         
             if (service.service_type == 7) {
                 isGSS = true;
             } else {

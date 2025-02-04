@@ -20,6 +20,7 @@ const getProductSourcesUrl = '/odata/v2/ProductSources';
  * @param {string} req.body.username username
  * @param {string} req.body.password password. will be stored encrypted with proper algorithm
  * @param {string} req.body.service_url service_url
+ * @param {string} req.body.token_url token_url
  * @param {int} req.body.service_type service_type (reference to service_type model, id field)
  * @param {string} req.body.centre service's centre
  * @returns {Service} the service created, status 201
@@ -27,10 +28,13 @@ const getProductSourcesUrl = '/odata/v2/ProductSources';
 exports.createOne = async (req, res, next) => {
 	try {
 		wlogger.debug("createOne: [POST] /services/");
+		wlogger.debug("Body: ");
+		wlogger.debug(req.body);
 		const service = await Service.create({
 			username: req.body.username,
 			password: Utilcrypto.encrypt(req.body.password), //Encypted by default
 			service_url: req.body.service_url,
+			token_url: req.body.token_url,
 			service_type: req.body.service_type,
 			centre: req.body.centre,
 		});

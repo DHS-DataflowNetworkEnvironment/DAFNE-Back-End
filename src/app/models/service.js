@@ -21,6 +21,11 @@ const Service = db.define('Service', {
         allowNull: false,
         unique: true
     },
+    token_url: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: false
+    },
     service_type: {
       type: Sequelize.INTEGER,
       allowNull: false

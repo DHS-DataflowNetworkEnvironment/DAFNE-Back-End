@@ -13,6 +13,11 @@ const Service_Type= db.define('service_type', {
     allowNull: false,
     unique: true
   },
+  supports_oauth2: {
+    allowNull: false,
+    type: Sequelize.BOOLEAN,
+    defaultValue: false
+  },
   createdAt: {
     allowNull: false,
     type: Sequelize.DATE,

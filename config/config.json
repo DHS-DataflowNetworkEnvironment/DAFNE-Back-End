@@ -3,7 +3,7 @@
 		"zippedArchive": false,
 		"dateFormat": "YYYY-MM-DD HH:mm:ss,SSS",
 		"maxSize": "50m",
-		"severity": "info",
+		"severity": "debug",
 		"logname": "dafne-be--%DATE%.log",
 		"datePattern": "YYYY-MM-DD"
 	},
