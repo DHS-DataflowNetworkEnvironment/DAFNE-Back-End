@@ -22,7 +22,7 @@ module.exports = {
         await queryInterface.sequelize.query(
           `UPDATE "service_types" SET "supports_oauth2" = :value WHERE id = :id;`,
           {
-            replacements: { id: serviceType.id, value: ((serviceType.id === 4 || serviceType.id === 6 || serviceType.id === 7) ? true : false) }, // Adjust logic as needed
+            replacements: { id: serviceType.id, value: ((serviceType.id === 4 || serviceType.id === 5 || serviceType.id === 7) ? true : false) }, // Adjust logic as needed
           }
         );
       }
