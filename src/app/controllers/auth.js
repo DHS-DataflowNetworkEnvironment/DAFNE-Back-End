@@ -17,7 +17,6 @@ exports.token = async (req, res) => {
     const clientId = conf.getConfig().auth.clientId;
     const grantType = conf.getConfig().auth.grantType;
     const requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
-    
     try {
       wlogger.info(`User login attempt`);
       const source = axios.CancelToken.source();
@@ -49,16 +48,26 @@ exports.token = async (req, res) => {
       
       let auth = {};
       auth.token = result.data;
-      auth.isAdmin = false
+      auth.isAdmin = false;
+      auth.isViewer = false;
       let decodedToken;
       let adminRole = (conf.getConfig().adminRole) ? conf.getConfig().adminRole : 'DATAFLOW_MANAGER';
+      let viewerRole = (conf.getConfig().viewerRole) ? conf.getConfig().viewerRole : 'DATAFLOW_VIEWER';
       try {        
         decodedToken = jwt.decode(auth.token.access_token); //decodes and verifies the token extracted form the header
         if (decodedToken.resource_access.dafne.roles.indexOf(adminRole) >= 0) {
           auth.isAdmin = true;
           wlogger.info(`Login HTTP Status code for user '${decodedToken.sub}': ${result.status}`);
           wlogger.info(`User '${decodedToken.sub}' has administration grants`);
-        } 
+        } else if (decodedToken.resource_access.dafne.roles.indexOf(viewerRole) >= 0) {
+          auth.isViewer = true;
+          wlogger.info(`Login HTTP Status code for user '${decodedToken.sub}': ${result.status}`);
+          wlogger.info(`User '${decodedToken.sub}' has viewer grants`);
+        } else {
+          // Cannot access without an assigned role.
+          wlogger.error("User role not accepted.");
+          return res.status(403).json("User role not accepted.");
+        }
       } catch (e) {
         wlogger.error({ 'level': 'error', 'message': { 'Token not valid!': e } });
       }

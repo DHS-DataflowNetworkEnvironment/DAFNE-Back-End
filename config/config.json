@@ -12,6 +12,7 @@
 		"password": "<PWD>",
 		"database": "dafne",
 		"host": "192.168.0.109",
+		"host_TEST": "192.168.180.78",
 		"port": "5432",
 		"dialect": "postgres",
 		"operatorsAliases": 0
@@ -48,5 +49,6 @@
 	"dataSourceStatus": ["RUNNING", "PENDING"],
 	"version": "4.0.0",
   "port": 2000,
-	"adminRole": "DATAFLOW_MANAGER"
+	"adminRole": "DATAFLOW_MANAGER",
+	"viewerRole": "DATAFLOW_VIEWER"
 }

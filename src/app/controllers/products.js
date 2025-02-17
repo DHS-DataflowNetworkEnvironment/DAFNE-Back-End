@@ -14,6 +14,7 @@ const service_token = require('../services/service_token');
 const productsUrl_odata_v1 = "odata/v1/Products/$count?$filter=startswith(Name,':mission') and substringof(':type',Name) and CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
 const productsUrl_odata_v4 = "odata/v1/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json";
 const productsUrl_odata_v4_GSS = "odata/v2/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json";
+// Completeness URL
 const productsFilterUrl = "odata/v1/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
 const productsFilterUrl_GSS = "odata/v2/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
 
