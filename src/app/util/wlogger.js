@@ -4,9 +4,15 @@ const conf = require('../util/config');
 const path = require('path');
 
 IsJsonString = (str) => typeof (str) == 'string' ? false : true;
-
+let isSeverityLevelValid = true;
+if (conf.getConfig().logger.severity.toLowerCase() !== "info" && 
+    conf.getConfig().logger.severity.toLowerCase() !== "debug" && 
+    conf.getConfig().logger.severity.toLowerCase() !== "warning" && 
+    conf.getConfig().logger.severity.toLowerCase() !== "error" ) {
+  isSeverityLevelValid = false;
+}
 const logger = winston.createLogger({
-  level:conf.getConfig().logger.severity || "info",
+  level: (isSeverityLevelValid ? conf.getConfig().logger.severity.toLowerCase() : "info"),
   format: winston.format.printf(
     info => `[${conf.getVersion()}][${moment().format(conf.getLoggerDateFormat())}] [${(info.level.toUpperCase())}] ${IsJsonString(info.message) ? JSON.stringify(info.message) : info.message}`
   ),
