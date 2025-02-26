@@ -29,7 +29,7 @@
 		"grantType": "password"
 	},
 	"availability": {
-		"schedule": "*/10 * * * *",
+		"schedule": "*/1 * * * *",
 		"enablePurge": true,
 		"purgeSchedule": "0 1 * * *",
 		"rollingPeriodInDays": 90,

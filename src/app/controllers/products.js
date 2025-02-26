@@ -86,7 +86,6 @@ exports.computeCompleteness = async (req, res, next) => {
 						serviceToken = await service_token.getServiceToken(service);
 						if (serviceToken && serviceToken.hasOwnProperty('access_token')) {
 							wlogger.debug("Got token.");
-							wlogger.debug("ACCESS TOKEN: " + serviceToken.access_token);
 						} else {
 							wlogger.error("Could not get token for service with token url: " + service.token_url);
 						}						
@@ -300,7 +299,6 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 						serviceToken = await service_token.getServiceToken(service);
 						if (serviceToken && serviceToken.hasOwnProperty('access_token')) {
 							wlogger.debug("Got token.");
-							wlogger.debug("ACCESS TOKEN: " + serviceToken.access_token);
 						} else {
 							wlogger.error("Could not get token for service with token url: " + service.token_url);
 						}						

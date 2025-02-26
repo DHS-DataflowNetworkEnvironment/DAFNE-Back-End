@@ -2,13 +2,15 @@
 const axios = require('axios');
 const Centre = require("../models/centre");
 const Service = require("../models/service");
+const ServiceType = require("../models/service_type");
 const ServiceAVailability = require("../models/service_availability");
 const Sequelize = require('sequelize');
 const urljoin = require('url-join');
 const Utilcrypto = require('../util/Utilcrypto');
 const wlogger = require('../util/wlogger');
 const conf = require('../util/config');
-const  cron = require('node-cron');
+const cron = require('node-cron');
+const service_token = require('./service_token');
 
 let job;
 let purgeJob;
@@ -21,7 +23,7 @@ let rollingPeriodInDays = 90;
 let enablePurge = true;
 let availability_endpoint = "odata/v1/Products?$top=1";
 
-checkServiceAVailability = async () => {
+checkServiceAvailability = async () => {
 	let status = 0;
 	let timeout;
 	try {
@@ -35,28 +37,46 @@ checkServiceAVailability = async () => {
 			where: {
 				centre: centre.id,
 				service_type: {
-					[Sequelize.Op.in]: [1, 2, 7]  //Exclude BE services from services - Added GSS(7) to the suitable services
+					[Sequelize.Op.in]: [1, 2, 4, 5, 6, 7]  //Exclude BE services from services - Added GSS(7) to the suitable services
 				}
 			},
             order: [['service_type', 'DESC']] //Order by service_type DESC to get the FE in case an FE + Single Instance configured (not a real case)
 		});
+        const serviceTypes = await ServiceType.findAll({});
 
 		let currentTimestamp = new Date().getTime();
         if(service) {
             // check service availability for local centre   
-            let isGSS = false;         
-            if (service.service_type == 7) {
-                isGSS = true;
+            let supportsOAuth2 = false;
+            let serviceToken = "";
+            wlogger.debug("LOCAL SERVICE for Availability: ");
+            wlogger.debug(service);
+
+            if (serviceTypes.filter((serviceTypeItem) => serviceTypeItem.id === service.service_type)[0].supports_oauth2 === true ) {
+                supportsOAuth2 = true;
+                wlogger.debug("Service Supports OAuth2 - Getting Service token..");
+                serviceToken = await service_token.getServiceToken(service);
+                if (serviceToken && serviceToken.hasOwnProperty('access_token')) {
+                    wlogger.debug("Got token.");
+                } else {
+                    wlogger.error("Could not get token for service with token url: " + service.token_url);
+                }						
             } else {
-                isGSS = false;
+                supportsOAuth2 = false;
             }
             let timeout;
             let description;
             let availability_url;
             try {
-                if (isGSS == true) {
-                    if(conf.getConfig().availability && conf.getConfig().availability.urlGSS ) {
-                        availability_endpoint = conf.getConfig().availability.urlGSS;
+                if (supportsOAuth2 == true) {
+                    if (service.service_type == 7) {
+                        if(conf.getConfig().availability && conf.getConfig().availability.urlGSS ) {
+                            availability_endpoint = conf.getConfig().availability.urlGSS;
+                        }
+                    } else {
+                        if(conf.getConfig().availability && conf.getConfig().availability.url ) {
+                            availability_endpoint = conf.getConfig().availability.url;
+                        }
                     }
                  } else {
                     if(conf.getConfig().availability && conf.getConfig().availability.url ) {
@@ -195,7 +215,7 @@ exports.createScheduler = () => {
         }
         job = cron.schedule(schedule, async() => {
             wlogger.info("Start verifying service availability...");
-            const status = await checkServiceAVailability();           
+            const status = await checkServiceAvailability();           
         })
     } catch(error) {
         wlogger.error("Error occurred while creating scheduler for service availability")
@@ -216,7 +236,7 @@ exports.checkAndUpdateScheduler = () => {
                 
                 job = cron.schedule(schedule, async() => {
                     wlogger.info("Start verifying service availability...");
-                    const status = await checkServiceAVailability();       
+                    const status = await checkServiceAvailability();       
                 })
 
             } else {
