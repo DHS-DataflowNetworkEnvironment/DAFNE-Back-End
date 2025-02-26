@@ -1,6 +1,8 @@
 //Models imports
 const axios = require('axios');
+const https = require('https');
 const Centre = require("../models/centre");
+const ServiceType = require("../models/service_type");
 const Service = require("../models/service");
 const Sequelize = require('sequelize');
 const urljoin = require('url-join');
@@ -57,7 +59,10 @@ exports.computeCompleteness = async (req, res, next) => {
 		wlogger.debug(dateRange);
 	
 		const centres = await Centre.findAll({});
-		
+		const serviceTypes = await ServiceType.findAll({});
+		wlogger.debug("SERVICE TYPES: ");
+		wlogger.debug(serviceTypes);
+
 		for (const centre of centres) {
 			
 			/* DHuS */
@@ -72,19 +77,23 @@ exports.computeCompleteness = async (req, res, next) => {
 					}
 				});
 				if(service) {
-					let isGSS = false;
+					let supportsOAuth2 = false;
 					let serviceToken = "";
-					if (service.service_type == 7) {
-						isGSS = true;
-						wlogger.debug("Getting Service token..");
+					wlogger.debug("SERVICE: ");
+					wlogger.debug(service);
+					//if (service.service_type == 7) {
+					if (serviceTypes.filter((serviceTypeItem) => serviceTypeItem.id === service.service_type)[0].supports_oauth2 === true ) {
+						supportsOAuth2 = true;
+						wlogger.debug("Service Supports OAuth2 - Getting Service token..");
 						serviceToken = await service_token.getServiceToken(service);
 						if (serviceToken && serviceToken.hasOwnProperty('access_token')) {
 							wlogger.debug("Got token.");
+							wlogger.debug("ACCESS TOKEN: " + serviceToken.access_token);
 						} else {
 							wlogger.error("Could not get token for service with token url: " + service.token_url);
 						}						
 					} else {
-						isGSS = false;
+						supportsOAuth2 = false;
 					}
 					// get service completeness for each date in range
 					for (const date of dateRange) {
@@ -94,8 +103,12 @@ exports.computeCompleteness = async (req, res, next) => {
 							if (service.service_type < 4) {
 								requestUrl = productsUrl_odata_v1.replace(':mission', mission).replace(':type', productType);
 							} else {
-								if (isGSS == true) {
-									requestUrl = productsUrl_odata_v4_GSS.replace(':mission', mission).replace(':type', productType);
+								if (supportsOAuth2 == true) {
+									if (service.service_type == 7) {
+										requestUrl = productsUrl_odata_v4_GSS.replace(':mission', mission).replace(':type', productType);
+									} else {
+										requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
+									}
 								} else {
 									requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
 								}
@@ -113,7 +126,8 @@ exports.computeCompleteness = async (req, res, next) => {
 
 							// Get completeness for current service:
 							let count = {};
-							if (isGSS == true) {
+							if (supportsOAuth2 == true) {
+
 								count = await axios({
 									method: 'get',
 									url: urljoin(service.service_url, requestUrl),

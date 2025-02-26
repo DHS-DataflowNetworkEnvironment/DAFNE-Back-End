@@ -26,6 +26,11 @@ const Service = db.define('Service', {
         allowNull: true,
         unique: false
     },
+    client_id: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: false
+    },
     service_type: {
       type: Sequelize.INTEGER,
       allowNull: false

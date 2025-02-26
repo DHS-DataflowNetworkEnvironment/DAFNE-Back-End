@@ -8,7 +8,7 @@ exports.getServiceToken = async (service) => {
     'username': service.username,
     'password': Utilcrypto.decrypt(service.password),
     'grant_type': 'password',
-    'client_id': 'dhs2'
+    'client_id': service.client_id
   });
   let config = {
     method: 'post',
