@@ -60,8 +60,6 @@ exports.computeCompleteness = async (req, res, next) => {
 	
 		const centres = await Centre.findAll({});
 		const serviceTypes = await ServiceType.findAll({});
-		wlogger.debug("SERVICE TYPES: ");
-		wlogger.debug(serviceTypes);
 
 		for (const centre of centres) {
 			
@@ -81,7 +79,7 @@ exports.computeCompleteness = async (req, res, next) => {
 					let serviceToken = "";
 					wlogger.debug("SERVICE: ");
 					wlogger.debug(service);
-					//if (service.service_type == 7) {
+
 					if (serviceTypes.filter((serviceTypeItem) => serviceTypeItem.id === service.service_type)[0].supports_oauth2 === true ) {
 						supportsOAuth2 = true;
 						wlogger.debug("Service Supports OAuth2 - Getting Service token..");
@@ -262,7 +260,7 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 	let completeness = [];
 		
 	try {
-		wlogger.debug("request body");
+		wlogger.debug("Compute filter completeness - request body");
 		wlogger.debug(req.body);
 		// ger request body fields
 		let filter = "";
@@ -273,11 +271,12 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 		const stopDate = new Date(req.body.stopDate);
 		// get list of dates
 		const dateRange = util.getDatesList(startDate, stopDate)
-		wlogger.debug("Compute completeness for the following dates:");
+		wlogger.debug("Compute filter completeness for the following dates:");
 		wlogger.debug(dateRange);
 	
 		const centres = await Centre.findAll({});
-		
+		const serviceTypes = await ServiceType.findAll({});
+
 		for (const centre of centres) {
 			try {
 				// Get the FE or Single Instance services of each centre
@@ -285,26 +284,47 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 					where: {
 						centre: centre.id,
 						service_type: {
-							[Sequelize.Op.in]: [1, 2]  //Exclude BE services from completeness computation
+							[Sequelize.Op.in]: [1, 2, 4, 5, 6, 7]  //Exclude BE services from completeness computation
 						}
 					}
 				});
-				if(service) {  
-					let isGSS = false;         
-					if (service.service_type == 7) {
-							isGSS = true;
+				if(service) {     
+					let supportsOAuth2 = false;
+					let serviceToken = "";
+					wlogger.debug("SERVICE: ");
+					wlogger.debug(service);
+
+					if (serviceTypes.filter((serviceTypeItem) => serviceTypeItem.id === service.service_type)[0].supports_oauth2 === true ) {
+						supportsOAuth2 = true;
+						wlogger.debug("Service Supports OAuth2 - Getting Service token..");
+						serviceToken = await service_token.getServiceToken(service);
+						if (serviceToken && serviceToken.hasOwnProperty('access_token')) {
+							wlogger.debug("Got token.");
+							wlogger.debug("ACCESS TOKEN: " + serviceToken.access_token);
+						} else {
+							wlogger.error("Could not get token for service with token url: " + service.token_url);
+						}						
 					} else {
-							isGSS = false;
+						supportsOAuth2 = false;
 					}
+
 					// get service completeness for each date in range
 					for (const date of dateRange) {
 						let timeout;
 						try {
 							let requestUrl = "";
-							if (isGSS == true) {
-								requestUrl = productsFilterUrl_GSS.replace(':filter', filter);
-							} else {
+							if (service.service_type < 4) {
 								requestUrl = productsFilterUrl.replace(':filter', filter);
+							} else {
+								if (supportsOAuth2 == true) {
+									if (service.service_type == 7) {
+										requestUrl = productsFilterUrl_GSS.replace(':filter', filter);
+									} else {
+										requestUrl = productsFilterUrl.replace(':filter', filter);
+									}
+								} else {
+									requestUrl = productsFilterUrl.replace(':filter', filter);
+								}
 							}
 							requestUrl = requestUrl.replace(/:date/g, date);
 							wlogger.debug("current requestUrl");
@@ -316,37 +336,73 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 								wlogger.error("No response received from Service while computing completeness " + service.service_url); 
 								wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
 							}, requestTimeout);
-							const count = await axios({
-								method: 'get',
-								url: urljoin(service.service_url, requestUrl),
-								auth: {
-									username: service.username,
-									password: Utilcrypto.decrypt(service.password)
-								},
-								validateStatus: false,
-								cancelToken: source.token
-								
-							}).catch(err => {
-								if (err.response) {
-								// client received an error response (5xx, 4xx)
-								wlogger.error("Received error response from Service while computing completeness " + service.service_url); 
-								wlogger.error(err);
-								} else if (err.request) {
-								// client never received a response, or request never left
-								wlogger.error("No response received from Service while computing completeness " + service.service_url); 
-								wlogger.error(err);
-								} else {
-								// anything else
-								wlogger.error("Error from Service while computing completeness " + service.service_url); 
-								wlogger.error(err);
-								}
-							});
+
+							// Get completeness for current service:
+							let count = {};
+							if (supportsOAuth2 == true) {
+								count = await axios({
+									method: 'get',
+									url: urljoin(service.service_url, requestUrl),
+									headers: {
+										'Authorization': 'Bearer '+serviceToken.access_token
+									},
+									validateStatus: false,
+									cancelToken: source.token
+								}).catch(err => {
+									if (err.response) {
+									// client received an error response (5xx, 4xx)
+									wlogger.error("Received error response from Service while computing completeness " + service.service_url); 
+									wlogger.error(err);
+									} else if (err.request) {
+									// client never received a response, or request never left
+									wlogger.error("No response received from Service while computing completeness " + service.service_url); 
+									wlogger.error(err);
+									} else {
+									// anything else
+									wlogger.error("Error from Service while computing completeness " + service.service_url); 
+									wlogger.error(err);
+									}
+								});
+							} else {
+								count = await axios({
+									method: 'get',
+									url: urljoin(service.service_url, requestUrl),
+									auth: {
+										username: service.username,
+										password: Utilcrypto.decrypt(service.password)
+									},
+									validateStatus: false,
+									cancelToken: source.token
+									
+								}).catch(err => {
+									if (err.response) {
+									// client received an error response (5xx, 4xx)
+									wlogger.error("Received error response from Service while computing completeness " + service.service_url); 
+									wlogger.error(err);
+									} else if (err.request) {
+									// client never received a response, or request never left
+									wlogger.error("No response received from Service while computing completeness " + service.service_url); 
+									wlogger.error(err);
+									} else {
+									// anything else
+									wlogger.error("Error from Service while computing completeness " + service.service_url); 
+									wlogger.error(err);
+									}
+								});
+							}
 							// Clear The Timeout
-    						clearTimeout(timeout);
+    					clearTimeout(timeout);
 							let value;
 							if(count && count.status == 200){
-							
-								value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data };
+								wlogger.debug("count.data:");
+								wlogger.debug(count.data);
+								if (service.service_type < 4) {
+									value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data };
+								} else {
+									wlogger.debug("count.data['@odata.count']:");
+									wlogger.debug(count.data["@odata.count"]);
+									value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data["@odata.count"] };
+								}
 							} else {
 								value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": -1 };
 							}
