@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const db = require('../util/database');
+const db = require('app/util/database');
 
 const Service = db.define('Service', {
 	id: {
@@ -20,6 +20,16 @@ const Service = db.define('Service', {
         type: Sequelize.STRING,
         allowNull: false,
         unique: true
+    },
+    token_url: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: false
+    },
+    client_id: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: false
     },
     service_type: {
       type: Sequelize.INTEGER,

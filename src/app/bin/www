@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('app');
+var http = require('http');
+const wlogger = require('app/util/wlogger');
+const dbParams = require('app/util/config').getDatabaseConfig();
+const sequelize = require('app/util/database');
+const conf = require('app/util/config');
+
+const scheduleAvailability = require('app/services/availability');
+const scheduleTimeliness = require('app/services/publication_timeliness');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(conf.getConfig().port || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+// Setup scheduler:
+(async () => {
+  //wlogger.info(process.env);  //Log ENVIRONMENT VARIABLES
+  try {
+    if (dbParams.username !== undefined) {
+      // wait till Sequelize is synchronized
+      wlogger.info('Sequelize Sync:');
+      await sequelize.sync({ force: false }); // force: true recreate db every time
+      server.listen(port);
+      wlogger.info('Server READY');
+      scheduleAvailability.createScheduler();
+      scheduleAvailability.createPurgeScheduler();
+      scheduleTimeliness.createScheduler();
+      scheduleTimeliness.createPurgeScheduler();
+      scheduleTimeliness.createFeRetryScheduler();
+      setInterval(function() {
+        scheduleAvailability.checkAndUpdateScheduler();
+        scheduleTimeliness.checkAndUpdateScheduler();
+        scheduleTimeliness.checkAndUpdateFeRetryScheduler();
+      }, 60000);  //TODO: replace with cfg param. At present check for new availability schedule every minute
+    } else {
+      wlogger.error('dbParams.username' + dbParams.username);
+    }
+  } catch (error) {
+     wlogger.error("Error in www file: " + error)
+  }
+})();
+//server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  wlogger.error("Fired onError! in www");
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'address ' + addr.address + ' and port ' + addr.port;
+  wlogger.info('Server listening on: ' + bind);
+}

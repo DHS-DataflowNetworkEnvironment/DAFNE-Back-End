@@ -13,6 +13,11 @@ module.exports = {
         allowNull: false,
         unique: true
       },
+      supports_oauth2: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,

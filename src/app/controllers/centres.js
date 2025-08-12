@@ -1,21 +1,20 @@
 //Models imports
 const axios = require('axios');
-const Centre = require("../models/centre");
-const Service = require("../models/service");
-const Sequelize = require('sequelize');
 const moment = require('moment');
-const sequelize = require('../util/database');
-const urljoin = require('url-join');
-const Utilcrypto = require('../util/Utilcrypto');
-const utility = require('../util/utility');
-const wlogger = require('../util/wlogger');
-const conf = require('../util/config');
+const Sequelize = require('sequelize');
+const Centre = require("app/models/centre");
+const Service = require("app/models/service");
+const sequelize = require('app/util/database');
+const Utilcrypto = require('app/util/utilcrypto');
+const utility = require('app/util/utility');
+const wlogger = require('app/util/wlogger');
+const conf = require('app/util/config');
 
-const evictionUrl = 'odata/v2/Evictions';
-const synchUrl = 'odata/v1/Synchronizers';
-const selectSynchUrl = 'odata/v1/Synchronizers?$select=ServiceUrl,Status';
-const productSourcesUrl = 'odata/v2/ProductSources';
-const intelliSynchUrl = 'odata/v2/Synchronizers?$expand=ReferencedSources';
+const evictionUrl = '/odata/v2/Evictions';
+const synchUrl = '/odata/v1/Synchronizers';
+const selectSynchUrl = '/odata/v1/Synchronizers?$select=ServiceUrl,Status';
+const productSourcesUrl = '/odata/v2/ProductSources';
+const intelliSynchUrl = '/odata/v2/Synchronizers?$expand=ReferencedSources';
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -56,15 +55,13 @@ exports.createOne = async (req, res, next) => {
 };
 
 
-//GET-ALL 
-// TODO: verify if it is needed, if yes for admin only
+//GET-ALL
 exports.getAll = async (req, res, next) => {
 	try {
 		let centres;
 		centres = await Centre.findAll({
 				order: [['name', 'ASC']],
 			});
-		wlogger.info({ "OK getAll Centres:": centres });
 		return res.status(200).json(centres);
 	} catch (error) {
 		wlogger.error(error);
@@ -188,7 +185,7 @@ getFakeDataSourcesInfo = () => {
 			}, requestTimeout);
 			const eviction = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, evictionUrl),
+				url: (new URL(service.service_url + evictionUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -253,7 +250,6 @@ getFakeDataSourcesInfo = () => {
 	try {
 		let dsInfo = [];
 		let cleanDsInfo = [];
-		//let centerServices = [];
 		const services = await Service.findAll({
 			where: {
 				centre: req.params.id,
@@ -272,10 +268,6 @@ getFakeDataSourcesInfo = () => {
 				}
 			}
 		});
-		// BUG SD-34 BEGIN
-		//centerServices = services.filter((arr) => arr.centre == req.params.id);
-		//wlogger.debug("center services are: ");
-		//wlogger.debug(centerServices);
 		let serviceUrls = feServices.map(x => x.service_url);
 		wlogger.debug("serviceUrls are: ");
 		wlogger.debug(serviceUrls);
@@ -283,7 +275,6 @@ getFakeDataSourcesInfo = () => {
 		for (const service of services) {			
 			const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 			wlogger.debug("Product Sources HTTP response");
-			//console.log(sources);
 			// Get info from odata/v1 synchronizers
 			if (sources && sources.status == 404) {
 				wlogger.info("Get Data Sources Info: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
@@ -315,9 +306,8 @@ getFakeDataSourcesInfo = () => {
 					cleanDsInfo = dsInfo.filter((arr, index, self) => {
 						const _obj = JSON.stringify(arr);
 						return index === self.findIndex(obj => {
-						return JSON.stringify(obj) === _obj;
+						  return JSON.stringify(obj) === _obj;
 						})
-						//index === self.findIndex((t) => (t.lastCreationDate === arr.lastCreationDate) && (t.info === arr.info) && (t.centre === arr.centre))
 					})
 					wlogger.debug("getDataSourcesInfo after removing duplicates is");
 					wlogger.debug(cleanDsInfo);
@@ -378,9 +368,8 @@ getFakeDataSourcesInfo = () => {
 					cleanDsInfo = dsInfo.filter((arr, index, self) => {
 						const _obj = JSON.stringify(arr);
 						return index === self.findIndex(obj => {
-						return JSON.stringify(obj) === _obj;
+						  return JSON.stringify(obj) === _obj;
 						})
-						//index === self.findIndex((t) => (t.lastCreationDate === arr.lastCreationDate) && (t.info === arr.info) && (t.centre === arr.centre))
 					})
 					wlogger.debug("getDataSourcesInfo after removing duplicates is");
 					wlogger.debug(cleanDsInfo);
@@ -427,7 +416,6 @@ getFakeDataSourcesInfo = () => {
 			
 			const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 				wlogger.debug("Product Sources HTTP response");
-				//console.log(sources);
 				// Get info from odata/v1 synchronizers
 				if (sources && sources.status == 404) {
 					wlogger.info("Get Map Data Sources Info: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
@@ -560,7 +548,6 @@ getFakeDataSourcesInfo = () => {
 				// Check if DHuS service support Intelligent Synchronizers by performing request to ProductSources entity
 				const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
 				wlogger.debug("Product Sources HTTP response");
-				//console.log(sources);
 				// Get info from odata/v1 synchronizers
 				if (sources && sources.status == 404) {
 					wlogger.info("Get DHS Connected: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
@@ -585,7 +572,7 @@ getFakeDataSourcesInfo = () => {
 					const intelliSynch = await utility.performDHuSServiceRequest(service, intelliSynchUrl);
 					if(intelliSynch && intelliSynch.status == 200 && intelliSynch.data){
 
-						wlogger.debug(intelliSynch.data.value); 
+						//wlogger.debug("DEV - intelliSynch.data.value: "+intelliSynch.data.value); 
 						// Check if Intelligent Synchronizer is Active from Cron.Active property
 						for (const element of intelliSynch.data.value) {
 							if (element.Cron.Active) {
@@ -615,7 +602,7 @@ getFakeDataSourcesInfo = () => {
 				} else {
 					wlogger.info("Failed to retrieve sources and synch list for service " + service.service_url)
 				}
-				
+			// TODO: Check if also service_types > 3 are needed here for DHS Connected
 			} else if (service.centre == req.params.id && service.service_type != 3 && service.service_type < 4) {  // get local services (excluding BE services and DAS services)
 				if (service.service_url.lastIndexOf('/') == service.service_url.length -1) {
 					centreServices.push(service.service_url.slice(0, -1));
@@ -878,7 +865,7 @@ exports.computeAverageAvailability = async (req, res, next) => {
 	}
 };
 
-//Compute service latency related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
+//Compute service timeliness related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
 // For all authenticated users
 /* Request body example:
  * {
@@ -902,16 +889,16 @@ exports.computeAverageAvailability = async (req, res, next) => {
 		}]
 	}
 */
-exports.computeLatency = async (req, res, next) => {
-	let publication_latency = {};
-	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe::float) as average_fe, avg(latency_be::float) as average_be, avg(case when latency_fe is not null then latency_fe::float else latency_be::float end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	wlogger.info("computeLatency: [GET] /centres/:id/service/latency/daily");
+exports.computeTimeliness = async (req, res, next) => {
+	let publication_timeliness = {};
+	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe) as average_fe, avg(timeliness_be) as average_be, avg(case when timeliness_fe is not null then timeliness_fe else timeliness_be end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe::float) as average_fe, avg(timeliness_be::float) as average_be, avg(case when timeliness_fe is not null then timeliness_fe::float else timeliness_be::float end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	wlogger.info("computeTimeliness: [GET] /centres/:id/service/timeliness/daily");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
 		}
-		publication_latency.centreId = req.params.id;
+		publication_timeliness.centreId = req.params.id;
 		wlogger.debug("request body");
 		wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
@@ -924,7 +911,7 @@ exports.computeLatency = async (req, res, next) => {
 			return res.status(400).json("startDate must be greater or equal than stopDate");
 		}
 		
-		wlogger.info(`Compute publication latency between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
+		wlogger.info(`Compute publication timeliness between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
 		 of the BE ${req.body.backendUrl}` );
 		
 		// Add query to retrieve availability results
@@ -935,17 +922,17 @@ exports.computeLatency = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
-		publication_latency.values = itemList;
+		publication_timeliness.values = itemList;
 		wlogger.debug("Daily Publication Layency:");
-		wlogger.debug(publication_latency)
-		return res.status(200).json(publication_latency);
+		wlogger.debug(publication_timeliness)
+		return res.status(200).json(publication_timeliness);
 	} catch (error) {
 		wlogger.error(error);
 		return res.status(500).json(error);
 	}
 };
 
-//Compute weekly service latency related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
+//Compute weekly service timeliness related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
 // For all authenticated users
 /* Request body example:
 {
@@ -966,22 +953,22 @@ exports.computeLatency = async (req, res, next) => {
             "synch_label": "S2 L2A",
             "average_fe": 1346705456.7605634,
             "average_be": 1346705456.7605634,
-            "average_latency": 1346705456.7605634,
+            "average_timeliness": 1346705456.7605634,
             "number_of_measurements": "213"
         }
     ]
 }
 */
-exports.computeLatencyWeekly = async (req, res, next) => {
-	let publication_latency = {};
-	//let query = "select to_char(date_trunc('week', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe) as average_fe, avg(latency_be) as average_be, avg(case when latency_fe is not null then latency_fe else latency_be end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by week, centre_id, synch_id, synch_label";
-	let query = "select to_char(date_trunc('week', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(latency_fe::float) as average_fe, avg(latency_be::float) as average_be, avg(case when latency_fe is not null then latency_fe::float else latency_be::float end) average_latency, count(*) as number_of_measurements from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	wlogger.info("computeLatencyWeekly: [GET] /centres/:id/service/latency/weekly");
+exports.computeTimelinessWeekly = async (req, res, next) => {
+	let publication_timeliness = {};
+	//let query = "select to_char(date_trunc('week', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe) as average_fe, avg(timeliness_be) as average_be, avg(case when timeliness_fe is not null then timeliness_fe else timeliness_be end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by week, centre_id, synch_id, synch_label";
+	let query = "select to_char(date_trunc('week', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe::float) as average_fe, avg(timeliness_be::float) as average_be, avg(case when timeliness_fe is not null then timeliness_fe::float else timeliness_be::float end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
+	wlogger.info("computeTimelinessWeekly: [GET] /centres/:id/service/timeliness/weekly");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
 		}
-		publication_latency.centreId = req.params.id;
+		publication_timeliness.centreId = req.params.id;
 		wlogger.debug("request body");
 		wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
@@ -994,7 +981,7 @@ exports.computeLatencyWeekly = async (req, res, next) => {
 			return res.status(400).json("startDate must be greater or equal than stopDate");
 		}
 		
-		wlogger.info(`Compute weekly publication latency between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
+		wlogger.info(`Compute weekly publication timeliness between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
 		 of the BE ${req.body.backendUrl}` );
 		
 		// Add query to retrieve availability results
@@ -1005,17 +992,17 @@ exports.computeLatencyWeekly = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
-		publication_latency.values = itemList;
+		publication_timeliness.values = itemList;
 		wlogger.debug("Weekly Publication Layency:");
-		wlogger.debug(publication_latency)
-		return res.status(200).json(publication_latency);
+		wlogger.debug(publication_timeliness)
+		return res.status(200).json(publication_timeliness);
 	} catch (error) {
 		wlogger.error(error);
 		return res.status(500).json(error);
 	}
 };
 
-//Compute service latency daily details related to provided date for the provided centre, BE Service and sync (identified by id/label)
+//Compute service timeliness daily details related to provided date for the provided centre, BE Service and sync (identified by id/label)
 // For all authenticated users
 /* Request body example:
  * {
@@ -1051,16 +1038,16 @@ exports.computeLatencyWeekly = async (req, res, next) => {
 		}]
 	}
 */
-exports.computeLatencyDetails = async (req, res, next) => {
-	let publication_latency = {};
-	//let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe, latency_be from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', "timestamp") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
-	let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, latency_fe::float, latency_be::float from publication_latency WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, synch_id, synch_label, latency_fe, latency_be";
-	wlogger.info("computeLatencyDetails: [GET] /centres/:id/service/latency/daily/details");
+exports.computeTimelinessDetails = async (req, res, next) => {
+	let publication_timeliness = {};
+	//let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, timeliness_fe, timeliness_be from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', "timestamp") = ? group by timestamp, centre_id, synch_id, synch_label, timeliness_fe, timeliness_be";
+	let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, timeliness_fe::float, timeliness_be::float from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, synch_id, synch_label, timeliness_fe, timeliness_be";
+	wlogger.info("computeTimelinessDetails: [GET] /centres/:id/service/timeliness/daily/details");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
 		}
-		publication_latency.centreId = req.params.id;
+		publication_timeliness.centreId = req.params.id;
 		wlogger.debug("request body");
 		wlogger.debug(req.body);
 		if (!req.body.date) {
@@ -1070,7 +1057,7 @@ exports.computeLatencyDetails = async (req, res, next) => {
 			return res.status(400).json("Invalid Date Format")
 		}
 		
-		wlogger.info(`Compute publication latency details in the date ${req.body.date} for the sync ${req.body.synchId} - ${req.body.synchLabel}
+		wlogger.info(`Compute publication timeliness details in the date ${req.body.date} for the sync ${req.body.synchId} - ${req.body.synchLabel}
 		 of the BE ${req.body.backendUrl}` );
 		
 		// Add query to retrieve availability results
@@ -1081,10 +1068,10 @@ exports.computeLatencyDetails = async (req, res, next) => {
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
-		publication_latency.values = itemList;
+		publication_timeliness.values = itemList;
 		wlogger.debug("Daily Publication Layency Details:");
-		wlogger.debug(publication_latency)
-		return res.status(200).json(publication_latency);
+		wlogger.debug(publication_timeliness)
+		return res.status(200).json(publication_timeliness);
 	} catch (error) {
 		wlogger.error(error);
 		return res.status(500).json(error);

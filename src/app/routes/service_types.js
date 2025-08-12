@@ -1,7 +1,7 @@
-const controller = require('../controllers/' + 'service_types');
 const router = require('express').Router();
-const isAuth = require('../auth/is-auth');
-const isAdmin = require('../auth/is-admin');
+const controller = require('app/controllers/service_types');
+const isAuth = require('app/auth/is-auth');
+const isAdmin = require('app/auth/is-admin');
 
 /** CRUD OPERATIONS */
 //READ ALL USERS -> [GET] ../servicetypes

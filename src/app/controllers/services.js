@@ -1,10 +1,11 @@
 //Models imports
-const Service = require("../models/service");
+const Service = require("app/models/service");
 
 //Util imports
-const wlogger = require('../util/wlogger');
-const Utilcrypto = require('../util/Utilcrypto');
-const utility = require('../util/utility');
+const wlogger = require('app/util/wlogger');
+const Utilcrypto = require('app/util/utilcrypto');
+const utility = require('app/util/utility');
+const service_token = require('app/services/service_token');
 
 const getSynchronizersUrl = 'odata/v2/Synchronizers';
 const getProductSourcesUrl = '/odata/v2/ProductSources';
@@ -20,6 +21,8 @@ const getProductSourcesUrl = '/odata/v2/ProductSources';
  * @param {string} req.body.username username
  * @param {string} req.body.password password. will be stored encrypted with proper algorithm
  * @param {string} req.body.service_url service_url
+ * @param {string} req.body.token_url token_url
+ * @param {string} req.body.client_id client_id
  * @param {int} req.body.service_type service_type (reference to service_type model, id field)
  * @param {string} req.body.centre service's centre
  * @returns {Service} the service created, status 201
@@ -27,10 +30,14 @@ const getProductSourcesUrl = '/odata/v2/ProductSources';
 exports.createOne = async (req, res, next) => {
 	try {
 		wlogger.debug("createOne: [POST] /services/");
+		wlogger.debug("Body: ");
+		wlogger.debug(req.body);
 		const service = await Service.create({
 			username: req.body.username,
 			password: Utilcrypto.encrypt(req.body.password), //Encypted by default
 			service_url: req.body.service_url,
+			token_url: req.body.token_url,
+			client_id: req.body.client_id,
 			service_type: req.body.service_type,
 			centre: req.body.centre,
 		});
@@ -101,6 +108,12 @@ exports.updateOne = async (req, res) => {
 		}
 		const s = await Service.update(S, { where: { id: req.params.id } });
 		wlogger.log({ level: 'info', message: { "OK updateOne Service: ": s } });
+
+		// removing eventually saved token
+		if (S.token_url && S.token_url !== '') {
+			service_token.removeServiceToken(S);
+		}
+
 		return res.status(200).json(s);
 	} catch (error) {
 		wlogger.log({ level: 'info', message: { "ERROR in updateOne: ": error } });
@@ -119,9 +132,15 @@ exports.updateOne = async (req, res) => {
 exports.deleteOne = async (req, res) => {
 	try {
 		wlogger.debug("deleteOne: [DELETE] /services/:id");
-		const s = await Service.destroy({ where: { id: req.params.id } });
-		wlogger.debug({ "OK deleteOne Service: ": s });
-		return res.status(200).json(s);
+		const S = await Service.destroy({ where: { id: req.params.id } });
+		wlogger.debug({ "OK deleteOne Service: ": S });
+
+		// removing eventually saved token
+		if (S.token_url && S.token_url !== '') {
+			service_token.removeServiceToken(S);
+		}
+
+		return res.status(200).json(S);
 	} catch (error) {
 		wlogger.error({ "ERROR getdeleteOneOne Service: ": error });
 		wlogger.error(error);

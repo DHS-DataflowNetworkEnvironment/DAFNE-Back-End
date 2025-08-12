@@ -1,6 +1,6 @@
-const controller = require('../controllers/' + 'products');
 const router = require('express').Router();
-const isAuth = require('../auth/is-auth');
+const controller = require('app/controllers/products');
+const isAuth = require('app/auth/is-auth');
 
 /** CRUD OPERATIONS */
 

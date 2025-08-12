@@ -1,50 +1,53 @@
-const Config = require('refresh-config');
-const fs = require('fs');
+
 const path = require('path');
-var urljoin = require('url-join');
-
-const confPath = path.join(process.env.CONF_PATH, 'config.json');
-
-var config = Config(confPath);
-
-config.on('error', function(err) {
-    console.error(err.stack);
-});
-
-config.on('change', function() {
-    console.log('configuration updated');
-});
+const configFile = require(process.env.CONF_PATH + "config.json");
+const env = process.env.NODE_ENV || 'development';
 
 exports.getConfig = () => {
-    return config.data;
-};
-
-exports.getDatabaseConfig = () => {
-    return config.data[process.env.NODE_ENV];
+  return configFile;
 }
 
-exports.getVersion = () => {
-    return config.data.version;
-};
+exports.getDatabaseConfig = () => {
+  return configFile[env];
+}
+
+exports.getWloggerConfig = () => {
+  return configFile.logger;
+}
 
 exports.getLoggerDateFormat = () => {
-    var logFormat = 'YYYY-MM-DD HH:mm:ss,SSS';
-    if(config.data.logger.dateFormat)
-        logFormat = config.data.logger.dateFormat;
-    return logFormat;
+  var logFormat = 'YYYY-MM-DD HH:mm:ss.SSS';
+  if(configFile.logger.dateFormat)
+      logFormat = configFile.logger.dateFormat;
+  return logFormat;
+};
+
+exports.getVersion = () => {
+  return configFile.version;
+};
+
+exports.getAuthConfig = () => {
+  return configFile.auth;
+}
+
+exports.getRequestTimeout = () => {
+  var timeout = 30000;
+  if (configFile.requestTimeout)
+    timeout = configFile.requestTimeout;
+  return timeout;
 };
 
 exports.getTokenUrl = () => {
-    const KEYCLOAK_BASE_URL = config.data.auth.keycloakBaseUrl;
-    return (config.data.auth.tokenEndPoint) ? urljoin(KEYCLOAK_BASE_URL, config.data.auth.tokenEndPoint) : urljoin(KEYCLOAK_BASE_URL, 'token'); 
+  const KEYCLOAK_BASE_URL = configFile.auth.keycloakBaseUrl;
+  return (configFile.auth.tokenEndPoint) ? new URL(KEYCLOAK_BASE_URL + configFile.auth.tokenEndPoint) : new URL(KEYCLOAK_BASE_URL + '/token'); 
 };
 
 exports.getUserinfoUrl = () => {
-    const KEYCLOAK_BASE_URL = config.data.auth.keycloakBaseUrl;
-    return (config.data.auth.userinfoEndPoint) ? urljoin(KEYCLOAK_BASE_URL, config.data.auth.userinfoEndPoint) : urljoin(KEYCLOAK_BASE_URL, 'userinfo');
+  const KEYCLOAK_BASE_URL = configFile.auth.keycloakBaseUrl;
+  return (configFile.auth.userinfoEndPoint) ? new URL(KEYCLOAK_BASE_URL + configFile.auth.userinfoEndPoint) : new URL(KEYCLOAK_BASE_URL + '/userinfo');
 };
 
 exports.getLogoutUrl = () => {
-    const KEYCLOAK_BASE_URL = config.data.auth.keycloakBaseUrl;
-    return (config.data.auth.logoutEndPoint) ? urljoin(KEYCLOAK_BASE_URL, config.data.auth.logoutEndPoint) : urljoin(KEYCLOAK_BASE_URL, 'logout');
+  const KEYCLOAK_BASE_URL = configFile.auth.keycloakBaseUrl;
+  return (configFile.auth.logoutEndPoint) ? new URL(KEYCLOAK_BASE_URL + configFile.auth.logoutEndPoint) : new URL(KEYCLOAK_BASE_URL + '/logout');
 };

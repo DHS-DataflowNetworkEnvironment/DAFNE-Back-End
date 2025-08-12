@@ -1,5 +1,11 @@
 //Utility Crypto functions
-const crypto = require('crypto');
+let crypto;
+try {
+  crypto = require('node:crypto');
+} catch (err) {
+  console.error('crypto support is disabled!');
+}
+
 const stringifyOrdered = require('json-stable-stringify');
 const conf = require('./config');
 

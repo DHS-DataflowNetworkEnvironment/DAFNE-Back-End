@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
-const db = require('../util/database');
+const db = require('app/util/database');
 
-const PublicationLatency = db.define('publication_latency', {
+const PublicationTimeliness = db.define('publication_latency', {
 	id: {
     type: Sequelize.BIGINT,
     autoIncrement: true,
@@ -117,6 +117,6 @@ const PublicationLatency = db.define('publication_latency', {
 });
   
 
-PublicationLatency.schema("public");
+PublicationTimeliness.schema("public");
 
-module.exports = PublicationLatency;
+module.exports = PublicationTimeliness;

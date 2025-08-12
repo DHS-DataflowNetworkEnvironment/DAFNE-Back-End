@@ -1,28 +1,28 @@
 //Models imports
-const Centre = require("../models/centre");
-const Service = require("../models/service");
-const PublicationLatency = require("../models/publication_latency");
 const Sequelize = require('sequelize');
-const utility = require('../util/utility');
-const wlogger = require('../util/wlogger');
-const conf = require('../util/config');
-const  cron = require('node-cron');
+const cron = require('node-cron');
 const moment = require('moment');
+const Centre = require("app/models/centre");
+const Service = require("app/models/service");
+const PublicationTimeliness = require("app/models/publication_timeliness");
+const utility = require('app/util/utility');
+const wlogger = require('app/util/wlogger');
+const conf = require('app/util/config');
 
 let job;
 let purgeJob;
 let feRetryJob;
-// default check publication latency schedule 10 minutes
+// default check publication timeliness schedule 10 minutes
 let schedule = "0 * * * *";
-// default purge publication latency  table, evry day at 01:00 AM
+// default purge publication timeliness  table, evry day at 01:00 AM
 let purgeSchedule = "0 1 * * *";
-// default publication latency  rolling period 90 days
+// default publication timeliness  rolling period 90 days
 let rollingPeriodInDays = 90;
 let enablePurge = true;
 
-// default check Front-End publication latency schedule 5 minutes
+// default check Front-End publication timeliness schedule 5 minutes
 let feRetrySchedule = "*/5 * * * *";
-// default Front-End publication latency number of retries
+// default Front-End publication timeliness number of retries
 let feMaxRetry = 10;
 
 const synchUrl = 'odata/v1/Synchronizers';
@@ -63,7 +63,7 @@ getSourceService = async(url) => {
 }
 
 /*
-   Method used to compute latency checking data retrieved from local BE, FE and Referenced Data Source
+   Method used to compute timeliness checking data retrieved from local BE, FE and Referenced Data Source
    Input parameters are:
    beProducts:          List of Products retrieved from the local BE with a given CreationDate interval
    sourceUrl:           DataSource service URL
@@ -78,7 +78,7 @@ getSourceService = async(url) => {
    currentTimestamp:    Measure timestamp
    
  */
-manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, productUrlByDate, currentTimestamp) => {
+manageTimeliness = async (sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, productUrlByDate, currentTimestamp) => {
     
     try {
         let description;
@@ -116,10 +116,10 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
                     description = 'No local FE configured';
                 }
                
-                const latencyBe =  new Date(beProduct.CreationDate) - new Date(sourceProductCreationDate);
-                const latencyFe =  (feProduct) ? (new Date(feProduct.CreationDate) - new Date(sourceProductCreationDate)) : null;                                            
+                const timelinessBe =  new Date(beProduct.CreationDate) - new Date(sourceProductCreationDate);
+                const timelinessFe =  (feProduct) ? (new Date(feProduct.CreationDate) - new Date(sourceProductCreationDate)) : null;                                            
                 const creationDateFe = (feProduct) ? feProduct.CreationDate : null;
-                const publication_latency = await PublicationLatency.create({
+                const publication_timeliness = await PublicationTimeliness.create({
                     timestamp: currentTimestamp,
                     backend_url: service.service_url,
                     frontend_url: frontEndUrl,
@@ -135,20 +135,20 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
                     creation_date_be: beProduct.CreationDate,
                     creation_date_fe: creationDateFe,
                     creation_date_source: sourceProductCreationDate,
-                    latency_be: latencyBe,
-                    latency_fe: latencyFe,
+                    latency_be: timelinessBe,
+                    latency_fe: timelinessFe,
                     description: description
                 });
-                wlogger.debug(publication_latency);
-                wlogger.info(`Added new publication latency measure with values: timestamp - ${currentTimestamp}, backend_url - ${service.service_url}, frontend_url - ${frontEndUrl},
+                wlogger.debug(publication_timeliness);
+                wlogger.info(`Added new publication timeliness measure with values: timestamp - ${currentTimestamp}, backend_url - ${service.service_url}, frontend_url - ${frontEndUrl},
                 centre_id - ${centre.id}, synch_id -  ${element.Id}, synch_label - ${element.Label}, synch_filter - ${element.FilterParam}, synch_geo_filter - ${element.GeoFilter}
                 source_url - ${sourceUrl}, source_last_creation_date -  ${lastCreationDate}, product_name - ${beProduct.Name}, product_id - ${beProduct.Id}, creation_date_be - ${beProduct.CreationDate}
-                creation_date_fe - ${creationDateFe}, creation_date_source -  ${sourceProductCreationDate}, latency_be - ${latencyBe}, latency_fe - ${latencyFe}`);
+                creation_date_fe - ${creationDateFe}, creation_date_source -  ${sourceProductCreationDate}, latency_be - ${timelinessBe}, latency_fe - ${timelinessFe}`);
             }
             else {
-                wlogger.warn(`Cannot find product ${sourceProduct.Name} on local BE. Publication Latency cannot be computed`);
+                wlogger.warn(`Cannot find product ${sourceProduct.Name} on local BE. Publication Timeliness cannot be computed`);
                 description = `Cannot find product ${sourceProduct.Name} on local BE.`;
-                const publication_latency = await PublicationLatency.create({
+                const publication_timeliness = await PublicationTimeliness.create({
                     timestamp: currentTimestamp,
                     backend_url: service.service_url,
                     frontend_url: frontEndUrl,
@@ -164,16 +164,16 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
                     creation_date_source: sourceProductCreationDate,
                     description: description
                 });
-                wlogger.debug(publication_latency);
-                wlogger.info(`Added new publication latency measure with values: timestamp - ${currentTimestamp}, backend_url - ${service.service_url}, frontend_url - ${frontEndUrl},
+                wlogger.debug(publication_timeliness);
+                wlogger.info(`Added new publication timeliness measure with values: timestamp - ${currentTimestamp}, backend_url - ${service.service_url}, frontend_url - ${frontEndUrl},
                 centre_id - ${centre.id}, synch_id -  ${element.Id}, synch_label - ${element.Label}, synch_filter - ${element.FilterParam}, synch_geo_filter - ${element.GeoFilter}
                 source_url - ${sourceUrl}, source_last_creation_date -  ${lastCreationDate}, product_name - ${sourceProduct.Name}, product_id - ${sourceProduct.Id}, creation_date_source - ${sourceProductCreationDate}, 
                 description - ${description}`);
             }                                                                        
         } else {
-            wlogger.warn(`No products found on reference source ${sourceUrl} performing request ${productUrlByDate}. Publication Latency cannot be computed`);
+            wlogger.warn(`No products found on reference source ${sourceUrl} performing request ${productUrlByDate}. Publication Timeliness cannot be computed`);
             description = `No products found on reference source ${sourceUrl} related to Synchronizer ${element.Id} - ${element.Label}`;
-            const publication_latency = await PublicationLatency.create({
+            const publication_timeliness = await PublicationTimeliness.create({
                 timestamp: currentTimestamp,
                 backend_url: service.service_url,
                 centre_id: centre.id,
@@ -185,13 +185,13 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
                 source_last_creation_date: lastCreationDate,
                 description: description
             });
-            wlogger.debug(publication_latency);
-            wlogger.info(`Added new publication latency measure with values: timestamp - ${currentTimestamp}, backend_url - ${service.service_url}, centre_id - ${centre.id}, 
+            wlogger.debug(publication_timeliness);
+            wlogger.info(`Added new publication timeliness measure with values: timestamp - ${currentTimestamp}, backend_url - ${service.service_url}, centre_id - ${centre.id}, 
             synch_id -  ${element.Id}, synch_label - ${element.Label}, synch_filter - ${element.FilterParam}, synch_geo_filter - ${element.GeoFilter}, source_url - ${sourceUrl}, 
             source_last_creation_date -  ${lastCreationDate}, description - ${description}`);
         }
     } catch (err) {
-        wlogger.error(`Error while computing Publication Latency on reference source ${sourceUrl} related to Synchronizer ${element.Id} - ${element.Label}`)
+        wlogger.error(`Error while computing Publication Timeliness on reference source ${sourceUrl} related to Synchronizer ${element.Id} - ${element.Label}`)
         wlogger.error(err);
     }
 }
@@ -199,10 +199,10 @@ manageLatency = async (sourceProducts, sourceUrl, sourceService, service, feServ
 
 
 
-checkPublicationLatency = async () => {
+checkPublicationTimeliness = async () => {
 	let status = 0;    
 	try {
-        let latencyTolerance = (conf.getConfig().latency && conf.getConfig().latency.tolerance) ? conf.getConfig().latency.tolerance : 1;
+        let timelinessTolerance = (conf.getConfig().timeliness && conf.getConfig().timeliness.tolerance) ? conf.getConfig().timeliness.tolerance : 1;
 		
 		const centre = await Centre.findOne({
 			where: {
@@ -229,10 +229,10 @@ checkPublicationLatency = async () => {
         const frontEndUrl = (feService) ? feService.service_url : null;
 		let currentTimestamp = new Date().getTime();
         if(services.length === 0) {
-            wlogger.error("No suitable service found for centre " + centre.id + ". Cannot check local publication latency at " + currentTimestamp);
+            wlogger.error("No suitable service found for centre " + centre.id + ". Cannot check local publication timeliness at " + currentTimestamp);
         }
         for (const service of services) {
-            // check publication latency for local centre
+            // check publication timeliness for local centre
             /*
                 1. Identification of synchronizer configured, present on the BEs of the local center.
                 2. Identification of the updated CreationDate for that synch. 
@@ -240,14 +240,14 @@ checkPublicationLatency = async () => {
                 3. Identification of the last product synchronized for that filter in the DataSource
                 4. Identification of the last product synchronized for that filter in the BE instance associated to the local centre
                 5. Identification of the same product synchronized for that filter in the FE instance associated to the local centre                
-                6. Publication Latency computation as difference between the CreationDate of DataSource and FE
+                6. Publication Timeliness computation as difference between the CreationDate of DataSource and FE
             */
             const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
-            wlogger.debug("Latency - Product Sources HTTP response");
+            wlogger.debug("Timeliness - Product Sources HTTP response");
             //console.log(sources);
             // Get info from odata/v1 synchronizers
             if (sources && sources.status == 404) {
-                wlogger.info("Publication Latency: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
+                wlogger.info("Publication Timeliness: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
                 const synch = await utility.performDHuSServiceRequest(service, synchUrl);
                 if(synch && synch.status == 200 && synch.data){
 
@@ -262,7 +262,7 @@ checkPublicationLatency = async () => {
                                 // Retrieve the source from the configured services of DAFNE (mandatory to access the source with credentials, not provided by the synchronizer)
                                 const sourceService = await getSourceService(sourceUrl);
                                 if(!sourceService) {
-                                    wlogger.warn(`The Data Source ${sourceUrl} is not configured among DAFNE services. Cannot compute the publication latency, 
+                                    wlogger.warn(`The Data Source ${sourceUrl} is not configured among DAFNE services. Cannot compute the publication timeliness, 
                                     data source credentials are missing`);
                                     
 
@@ -270,17 +270,17 @@ checkPublicationLatency = async () => {
                                     let requestFilter;
                                     //Retrieve synchronizer LastCreationDate
                                     const lastCreationDate = moment(element.LastCreationDate).utc().format('YYYY-MM-DDTHH:mm:ss.SSS')+'Z';
-                                    const lastCreationDateMin = moment(element.LastCreationDate).utc().subtract(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
-                                    const lastCreationDateMax = moment(element.LastCreationDate).utc().add(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
+                                    const lastCreationDateMin = moment(element.LastCreationDate).utc().subtract(timelinessTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
+                                    const lastCreationDateMax = moment(element.LastCreationDate).utc().add(timelinessTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
                                     if(element.FilterParam) {
                                         requestFilter = `${element.FilterParam } and CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
                                     } else {
                                         requestFilter = `CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
-                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Compute the publication latency based only on CreationDate`);
+                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Compute the publication timeliness based only on CreationDate`);
                                     }
                                     wlogger.info(`Finding on Referenced Source ${sourceService.service_url} the last synchronized product from Synch with Id = ${element.Id}, Label = ${element.Label},    
                                     sourceUrl =${sourceUrl}, FilterParam = ${element.FilterParam}, LastCreationDate = ${element.LastCreationDate}`);
-                                    wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${latencyTolerance} second(s), with a Creation Date   
+                                    wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${timelinessTolerance} second(s), with a Creation Date   
                                     between ${lastCreationDateMin} and ${lastCreationDateMax}`);
                                     
                                     let productUrlByFilterParam = searchProductByFilter;
@@ -288,12 +288,12 @@ checkPublicationLatency = async () => {
                                     wlogger.info(`Request to perform on Referenced Source  ${sourceService.service_url} is ${productUrlByFilterParam}`);
                                     //retrieve product in the Referenced Source
                                     const sourceProducts = await utility.performDHuSServiceRequest(sourceService, productUrlByFilterParam);
-                                    //compute Latency
-                                    await manageLatency(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
+                                    //compute Timeliness
+                                    await manageTimeliness(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
                                         productUrlByFilterParam, currentTimestamp);                                       
                                 }
                             } catch (e) {
-                                wlogger.error(`Error occurred while retrieving publication latency measure on local BE ${service.service_url}`);
+                                wlogger.error(`Error occurred while retrieving publication timeliness measure on local BE ${service.service_url}`);
                                 wlogger.error(e);                                
                             }
                         }						
@@ -322,7 +322,7 @@ checkPublicationLatency = async () => {
                                 // Retrieve the source from the configured services of DAFNE (mandatory to access the source with credentials, not provided by the synchronizer)
                                 const sourceService = await getSourceService(sourceUrl);
                                 if(!sourceService) {
-                                    wlogger.warn(`The Data Source ${sourceUrl} is not configured among DAFNE services. Cannot compute the publication latency, 
+                                    wlogger.warn(`The Data Source ${sourceUrl} is not configured among DAFNE services. Cannot compute the publication timeliness, 
                                     data source credentials are missing`);
                                     // TODO: insert N/A measure in the DAFNE DB
 
@@ -330,17 +330,17 @@ checkPublicationLatency = async () => {
                                     let requestFilter;
                                     //Retrieve synchronizer LastCreationDate
                                     const lastCreationDate = moment(rs.LastCreationDate).utc().format('YYYY-MM-DDTHH:mm:ss.SSS')+'Z';
-                                    const lastCreationDateMin = moment(rs.LastCreationDate).utc().subtract(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
-                                    const lastCreationDateMax = moment(rs.LastCreationDate).utc().add(latencyTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
+                                    const lastCreationDateMin = moment(rs.LastCreationDate).utc().subtract(timelinessTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
+                                    const lastCreationDateMax = moment(rs.LastCreationDate).utc().add(timelinessTolerance,'seconds').format('YYYY-MM-DDTHH:mm:ss.SSS');
                                     if (element.FilterParam) {
                                         requestFilter = `${element.FilterParam } and CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
                                     } else {
                                         requestFilter = `CreationDate ge datetime'${lastCreationDateMin}' and CreationDate le datetime'${lastCreationDateMax}'`;
-                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Compute the publication latency based only on CreationDate`);
+                                        wlogger.warn(`No FilterParam configured for Sync ${element.Id} - ${element.Label} on local BE ${service.service_url}. Compute the publication timeliness based only on CreationDate`);
                                     }
                                     wlogger.info(`Finding on Referenced Source ${sourceService.service_url} the last synchronized product from Synch with Id = ${element.Id}, Label = ${element.Label},    
                                     sourceUrl =${sourceUrl}, FilterParam = ${element.FilterParam}, LastCreationDate = ${lastCreationDate}`);
-                                    wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${latencyTolerance} second(s), with a Creation Date   
+                                    wlogger.info(`The last synchronized product will be searched with a tolerance interval of ${timelinessTolerance} second(s), with a Creation Date   
                                     between ${lastCreationDateMin} and ${lastCreationDateMax}`);
                                     
                                     let productUrlByFilterParam = searchProductByFilter;
@@ -348,12 +348,12 @@ checkPublicationLatency = async () => {
                                     wlogger.info(`Request to perform on Referenced Source ${sourceService.service_url} is ${productUrlByFilterParam}`);
                                     //retrieve product in the Reference Source
                                     const sourceProducts = await utility.performDHuSServiceRequest(sourceService, productUrlByFilterParam);
-                                    //compute Latency
-                                    await manageLatency(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
+                                    //compute Timeliness
+                                    await manageTimeliness(sourceProducts, sourceUrl, sourceService, service, feService, frontEndUrl, lastCreationDate, element, centre, 
                                         productUrlByFilterParam, currentTimestamp);
                                 }
                             } catch (e) {
-                                wlogger.error(`Error occurred while retrieving publication latency measure on local BE ${service.service_url}`);
+                                wlogger.error(`Error occurred while retrieving publication timeliness measure on local BE ${service.service_url}`);
                                 wlogger.error(e)
                             }
                                                         	
@@ -374,27 +374,27 @@ checkPublicationLatency = async () => {
     return status;
 };
 
-purgePublicationLatency = async() => {
+purgePublicationTimeliness = async() => {
     try {
 
-        if(conf.getConfig().latency && conf.getConfig().latency.rollingPeriodInDays ) {
-            if (isNaN(conf.getConfig().latency.rollingPeriodInDays)) {
-                wlogger.warn(`The parameter latency.rollingPeriodInDay must be a number. Found value: ${conf.getConfig().latency.rollingPeriodInDays}`);
+        if(conf.getConfig().timeliness && conf.getConfig().timeliness.rollingPeriodInDays ) {
+            if (isNaN(conf.getConfig().timeliness.rollingPeriodInDays)) {
+                wlogger.warn(`The parameter timeliness.rollingPeriodInDay must be a number. Found value: ${conf.getConfig().timeliness.rollingPeriodInDays}`);
                 wlogger.warn(`Using default: ${rollingPeriodInDays}`);
             } else {
-                rollingPeriodInDays = conf.getConfig().latency.rollingPeriodInDays;
+                rollingPeriodInDays = conf.getConfig().timeliness.rollingPeriodInDays;
             }
         }
         var rollingDate = new Date();
         rollingDate.setDate(rollingDate.getDate()-rollingPeriodInDays);
-        wlogger.info(`Start purging publication latency data older than ${rollingPeriodInDays}. Check date is ${rollingDate}`);
-        const purgedRows = await PublicationLatency.destroy({
+        wlogger.info(`Start purging publication timeliness data older than ${rollingPeriodInDays}. Check date is ${rollingDate}`);
+        const purgedRows = await PublicationTimeliness.destroy({
             where: { timestamp: {[Sequelize.Op.lt]: rollingDate} } 
 
         });
-        wlogger.info(`Successfully purged ${purgedRows} rows in publication latency`);
+        wlogger.info(`Successfully purged ${purgedRows} rows in publication timeliness`);
     } catch (error) {
-        wlogger.error("Errors occurred while purging publication latency");
+        wlogger.error("Errors occurred while purging publication timeliness");
         wlogger.error(error);
     }
     //where: { createdAt: {[Op.lt]: d,[Op.gte]: dy}}
@@ -405,36 +405,36 @@ exports.createScheduler = () => {
  
     try {
        
-        if(conf.getConfig().latency && conf.getConfig().latency.schedule && conf.getConfig().latency.schedule !== '') {
-            schedule = conf.getConfig().latency.schedule;
-            wlogger.info("[Publication Latency] Use configuration file scheduler: " + schedule);
+        if(conf.getConfig().timeliness && conf.getConfig().timeliness.schedule && conf.getConfig().timeliness.schedule !== '') {
+            schedule = conf.getConfig().timeliness.schedule;
+            wlogger.info("[Publication Timeliness] Use configuration file scheduler: " + schedule);
         } else {
-            wlogger.info("[Publication Latency] No scheduler defined in configuration file for publication latency. Using default scheduler: " + schedule);
+            wlogger.info("[Publication Timeliness] No scheduler defined in configuration file for publication timeliness. Using default scheduler: " + schedule);
         }
         job = cron.schedule(schedule, async() => {
-            wlogger.info("Start verifying publication latency...");
-            const status = await checkPublicationLatency();           
+            wlogger.info("Start verifying publication timeliness...");
+            const status = await checkPublicationTimeliness();           
         })
     } catch(error) {
-        wlogger.error("Error occurred while creating scheduler for publication latency")
+        wlogger.error("Error occurred while creating scheduler for publication timeliness")
 		wlogger.error(error);
 	}
 };
 
 exports.checkAndUpdateScheduler = () => {
     try {
-        wlogger.debug("[Publication Latency] Check configured schedule");
-        let newPeriod = (conf.getConfig().latency && conf.getConfig().latency.schedule) ? conf.getConfig().latency.schedule : null;
+        wlogger.debug("[Publication Timeliness] Check configured schedule");
+        let newPeriod = (conf.getConfig().timeliness && conf.getConfig().timeliness.schedule) ? conf.getConfig().timeliness.schedule : null;
         if(newPeriod && newPeriod != schedule ) {
-            wlogger.info("[Publication Latency] Reschedule job, found new scheduling period: " + newPeriod);
+            wlogger.info("[Publication Timeliness] Reschedule job, found new scheduling period: " + newPeriod);
             schedule = newPeriod;
             if (job) {
                 wlogger.info("Found not null job");	
                 job.stop();
                 
                 job = cron.schedule(schedule, async() => {
-                    wlogger.info("Start verifying publication latency...");
-                    const status = await checkPublicationLatency();      
+                    wlogger.info("Start verifying publication timeliness...");
+                    const status = await checkPublicationTimeliness();      
                 })
 
             } else {
@@ -442,7 +442,7 @@ exports.checkAndUpdateScheduler = () => {
             }
         }
     } catch(error) {
-        wlogger.error("Error occurred while updating scheduler for publication latency")
+        wlogger.error("Error occurred while updating scheduler for publication timeliness")
         wlogger.error(error);
     }
 };
@@ -451,26 +451,26 @@ exports.createPurgeScheduler = () => {
  
     try {
 
-        if(conf.getConfig().latency && conf.getConfig().latency.hasOwnProperty('enablePurge')) {
-            enablePurge = conf.getConfig().latency.enablePurge;
+        if(conf.getConfig().timeliness && conf.getConfig().timeliness.hasOwnProperty('enablePurge')) {
+            enablePurge = conf.getConfig().timeliness.enablePurge;
         }
         if(enablePurge) {
        
-            if(conf.getConfig().latency && conf.getConfig().latency.purgeSchedule && conf.getConfig().latency.purgeSchedule !== '') {
-                purgeSchedule = conf.getConfig().latency.purgeSchedule;
-                wlogger.info("[Publication Latency] Use configuration file purgeSchedule: " + purgeSchedule);
+            if(conf.getConfig().timeliness && conf.getConfig().timeliness.purgeSchedule && conf.getConfig().timeliness.purgeSchedule !== '') {
+                purgeSchedule = conf.getConfig().timeliness.purgeSchedule;
+                wlogger.info("[Publication Timeliness] Use configuration file purgeSchedule: " + purgeSchedule);
             } else {
-                wlogger.info("[Publication Latency] No purgeSchedule defined in configuration file for publication latency. Using default purgeSchedule: " + purgeSchedule);
+                wlogger.info("[Publication Timeliness] No purgeSchedule defined in configuration file for publication timeliness. Using default purgeSchedule: " + purgeSchedule);
             }
             purgeJob = cron.schedule(purgeSchedule, async() => {
-                wlogger.info("Start purging publication latency...");
-                await purgePublicationLatency();           
+                wlogger.info("Start purging publication timeliness...");
+                await purgePublicationTimeliness();           
             })
         } else {
-            wlogger.info("Publication latency purge is disabled. Please check your parameters if you want to enable it.");
+            wlogger.info("Publication timeliness purge is disabled. Please check your parameters if you want to enable it.");
         }
     } catch(error) {
-        wlogger.error("Error occurred while creating purgeSchedule for publication latency")
+        wlogger.error("Error occurred while creating purgeSchedule for publication timeliness")
 		wlogger.error(error);
 	}
 };
@@ -478,14 +478,14 @@ exports.createPurgeScheduler = () => {
 /**
  * This method implements the retry mechanism, configurable in terms of frequency and maximum number of retries, useful to retrieve a product on FE 
  */
-checkMissingFrontEndLatency = async () => {
+checkMissingFrontEndTimeliness = async () => {
 	try {
-        if(conf.getConfig().latency && conf.getConfig().latency.feMaxRetry ) {
-            if (isNaN(conf.getConfig().latency.feMaxRetry)) {
-                wlogger.warn(`The parameter latency.feMaxRetry must be a number. Found value: ${conf.getConfig().latency.feMaxRetry}`);
+        if(conf.getConfig().timeliness && conf.getConfig().timeliness.feMaxRetry ) {
+            if (isNaN(conf.getConfig().timeliness.feMaxRetry)) {
+                wlogger.warn(`The parameter timeliness.feMaxRetry must be a number. Found value: ${conf.getConfig().timeliness.feMaxRetry}`);
                 wlogger.warn(`Using default: ${feMaxRetry}`);
             } else {
-                feMaxRetry = conf.getConfig().latency.feMaxRetry;
+                feMaxRetry = conf.getConfig().timeliness.feMaxRetry;
             }
         }
 		
@@ -503,7 +503,7 @@ checkMissingFrontEndLatency = async () => {
 			},
             order: [['service_type', 'DESC']] //Order by service_type DESC to get the FE in case an FE + Single Instance configured (not a real case)
 		});               
-        const feLatencyList = await PublicationLatency.findAll({
+        const feTimelinessList = await PublicationTimeliness.findAll({
             where: {
                 centre_id: centre.id,
                 retry: {[Sequelize.Op.lt]: feMaxRetry},
@@ -512,37 +512,35 @@ checkMissingFrontEndLatency = async () => {
             },            
             order: [['timestamp', 'DESC']]
         });
-        for (const feLatency of feLatencyList) {
-            //console.log(feLatency);
+        for (const feTimeliness of feTimelinessList) {
             let product;
             let description;
-            const currentRetry = feLatency['retry'] + 1;
-            // Search on the local FE the referenced products used to compute Back-End latency and not yet found on FE
+            const currentRetry = feTimeliness['retry'] + 1;
+            // Search on the local FE the referenced products used to compute Back-End timeliness and not yet found on FE
             if (feService) {
                 let searchProductOnFeAndBe = searchProductOnService;
-                searchProductOnFeAndBe = searchProductOnFeAndBe.replace(':name',feLatency['product_name']);
-                wlogger.info(`Performing request ${searchProductOnFeAndBe} on Local FE ${feService.service_url} for retrieving product ${feLatency['product_name']} - ${feLatency['product_id']}.`);
+                searchProductOnFeAndBe = searchProductOnFeAndBe.replace(':name',feTimeliness['product_name']);
+                wlogger.info(`Performing request ${searchProductOnFeAndBe} on Local FE ${feService.service_url} for retrieving product ${feTimeliness['product_name']} - ${feTimeliness['product_id']}.`);
                 const products = await utility.performDHuSServiceRequest(feService, searchProductOnFeAndBe);
                 if(products && products.status == 200 && products.data && products.data.value && products.data.value.length > 0) { 
                     product =  products.data.value[0];
-                    wlogger.info(`Found product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE ${feService.service_url} after ${currentRetry} attempts.`);
-                    //compute latency in reference with local FE
+                    wlogger.info(`Found product ${feTimeliness['product_name']} - ${feTimeliness['product_id']} on Local FE ${feService.service_url} after ${currentRetry} attempts.`);
+                    //compute timeliness in reference with local FE
                 } else {
-                    wlogger.info(`Cannot find yet product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE ${feService.service_url} after ${currentRetry} attempts.`);
-                    description = `Cannot find yet product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE after ${currentRetry} attempts.`;
+                    wlogger.info(`Cannot find yet product ${feTimeliness['product_name']} - ${feTimeliness['product_id']} on Local FE ${feService.service_url} after ${currentRetry} attempts.`);
+                    description = `Cannot find yet product ${feTimeliness['product_name']} - ${feTimeliness['product_id']} on Local FE after ${currentRetry} attempts.`;
                 }
             } else {
-                wlogger.warn(`Cannot compute publication latency on local FE - No FE Service configured`);
-                description = `Cannot find yet product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE after ${currentRetry} attempts.`;
+                wlogger.warn(`Cannot compute publication timeliness on local FE - No FE Service configured`);
+                description = `Cannot find yet product ${feTimeliness['product_name']} - ${feTimeliness['product_id']} on Local FE after ${currentRetry} attempts.`;
                 
             }
-            const latencyFe =  (product) ? (new Date(product.CreationDate) - new Date(feLatency['creation_date_source'])) : null;     
+            const timelinessFe =  (product) ? (new Date(product.CreationDate) - new Date(feTimeliness['creation_date_source'])) : null;     
             // update retry
-            let latency = {retry: currentRetry, latency_fe: latencyFe, description: description};
-            const updatedLatency = await PublicationLatency.update(latency, { where: { id: feLatency['id'] } });   
-            wlogger.debug(`Updated latency for product ${feLatency['product_name']} - ${feLatency['product_id']} on Local FE ${feService.service_url} 
-            after ${currentRetry} attempts. New FE latency is ${latencyFe}`);
-            //wlogger.debug(updatedLatency);
+            let timeliness = {retry: currentRetry, latency_fe: timelinessFe, description: description};
+            const updatedTimeliness = await PublicationTimeliness.update(timeliness, { where: { id: feTimeliness['id'] } });   
+            wlogger.debug(`Updated timeliness for product ${feTimeliness['product_name']} - ${feTimeliness['product_id']} on Local FE ${feService.service_url} 
+            after ${currentRetry} attempts. New FE timeliness is ${timelinessFe}`);
         }   
            
 	} catch (error) {
@@ -554,44 +552,44 @@ exports.createFeRetryScheduler = () => {
  
     try {
        
-        if(conf.getConfig().latency && conf.getConfig().latency.feRetrySchedule && conf.getConfig().latency.feRetrySchedule !== '') {
-            feRetrySchedule = conf.getConfig().latency.feRetrySchedule;
-            wlogger.info("[Publication Latency - FE Retry] Use configuration file scheduler for missing FE latency: " + feRetrySchedule);
+        if(conf.getConfig().timeliness && conf.getConfig().timeliness.feRetrySchedule && conf.getConfig().timeliness.feRetrySchedule !== '') {
+            feRetrySchedule = conf.getConfig().timeliness.feRetrySchedule;
+            wlogger.info("[Publication Timeliness - FE Retry] Use configuration file scheduler for missing FE timeliness: " + feRetrySchedule);
         } else {
-            wlogger.info("[Publication Latency - FE Retry] No scheduler defined in configuration file for missing FE publication latency. Using default scheduler: " + feRetrySchedule);
+            wlogger.info("[Publication Timeliness - FE Retry] No scheduler defined in configuration file for missing FE publication timeliness. Using default scheduler: " + feRetrySchedule);
         }
         feRetryJob = cron.schedule(feRetrySchedule, async() => {
-            wlogger.info("Start verifying missing FE publication latency...");
-            const status = await checkMissingFrontEndLatency();           
+            wlogger.info("Start verifying missing FE publication timeliness...");
+            const status = await checkMissingFrontEndTimeliness();           
         })
     } catch(error) {
-        wlogger.error("Error occurred while creating scheduler for missing FE publication latency")
+        wlogger.error("Error occurred while creating scheduler for missing FE publication timeliness")
 		wlogger.error(error);
 	}
 };
 
 exports.checkAndUpdateFeRetryScheduler = () => {
     try {
-        wlogger.debug("[Publication Latency - FE Retry] Check configured schedule");
-        let newPeriod = (conf.getConfig().latency && conf.getConfig().latency.feRetrySchedule) ? conf.getConfig().latency.feRetrySchedule : null;
+        wlogger.debug("[Publication Timeliness - FE Retry] Check configured schedule");
+        let newPeriod = (conf.getConfig().timeliness && conf.getConfig().timeliness.feRetrySchedule) ? conf.getConfig().timeliness.feRetrySchedule : null;
         if(newPeriod && newPeriod != feRetrySchedule ) {
-            wlogger.info("[Publication Latency - FE Retry] Reschedule job, found new scheduling period: " + newPeriod);
+            wlogger.info("[Publication Timeliness - FE Retry] Reschedule job, found new scheduling period: " + newPeriod);
             feRetrySchedule = newPeriod;
             if (feRetryJob) {
                 wlogger.info("Found not null job");	
                 feRetryJob.stop();
                 
                 feRetryJob = cron.schedule(feRetrySchedule, async() => {
-                    wlogger.info("Start verifying missing FE publication latency...");
-                    const status = await checkMissingFrontEndLatency();      
+                    wlogger.info("Start verifying missing FE publication timeliness...");
+                    const status = await checkMissingFrontEndTimeliness();      
                 })
 
             } else {
-                wlogger.info("No jobs found for missing FE publication latency");
+                wlogger.info("No jobs found for missing FE publication timeliness");
             }
         }
     } catch(error) {
-        wlogger.error("Error occurred while updating scheduler for missing FE publication latency")
+        wlogger.error("Error occurred while updating scheduler for missing FE publication timeliness")
         wlogger.error(error);
     }
 };

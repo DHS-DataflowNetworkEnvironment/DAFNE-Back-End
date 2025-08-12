@@ -1,33 +1,7 @@
 # Dependency packages #
 #############
-node_modules
-package-lock.json
+src/node_modules
+src/package-lock.json
 
-# Log files #
-##############
-*.log
-
-# IDE files #
-#############
-.~lock.*
-.buildpath
-
-# Netbeans
-nbproject
-nbactions.xml
-nb-configuration.xml
-
-# Eclipse
-.classpath
-.project
-.settings/
-
-# Intellij
-.idea/
-.vscode/
-.factorypath
-*.iml
-*.iws
-
-dev-sequelize.js
-*.sqlite
+logs
+config

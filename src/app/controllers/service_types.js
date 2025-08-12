@@ -1,8 +1,8 @@
 //Models imports
-const ServiceType = require("../models/service_type");
+const ServiceType = require("app/models/service_type");
 
 //Util imports
-const wlogger = require('../util/wlogger');
+const wlogger = require('app/util/wlogger');
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -35,9 +35,8 @@ exports.getAll = async (req, res, next) => {
 	try {
 		let servicetype;
 		servicetype = await ServiceType.findAll({
-				order: [['service_type', 'ASC']],
-			});
-		wlogger.info({ "OK getAll ServiceType:": servicetype });
+      order: [['service_type', 'ASC']],
+    });
 		return res.status(200).json(servicetype);
 	} catch (error) {
 		wlogger.error(error);
@@ -89,7 +88,7 @@ exports.updateOne = async (req, res) => {
 /** [DELETE] /servicetypes/1
  *	DELETE ONE
  *
- * 	@param {string} req.params.id the service to delete
+ * 	@param {string} req.params.id the service type to delete
  *
  * 	@returns {} the 200 status code with a sequelize message if it was deleted correctly
  */

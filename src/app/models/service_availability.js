@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const db = require('../util/database');
+const db = require('app/util/database');
 
 const ServiceAvailability = db.define('service_availability', {
 	id: {

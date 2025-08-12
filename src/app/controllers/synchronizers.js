@@ -1,19 +1,18 @@
 //Models imports
 const axios = require('axios');
-const Centre = require("../models/centre");
-const Service = require("../models/service");
 const Sequelize = require('sequelize');
-const urljoin = require('url-join');
-const Utilcrypto = require('../util/Utilcrypto');
-const utility = require('../util/utility');
-const wlogger = require('../util/wlogger');
-const conf = require('../util/config');
+const Centre = require("app/models/centre");
+const Service = require("app/models/service");
+const Utilcrypto = require('app/util/utilcrypto');
+const utility = require('app/util/utility');
+const wlogger = require('app/util/wlogger');
+const conf = require('app/util/config');
 
-const synchUrl = 'odata/v1/Synchronizers'
-const collectionsUrl = 'odata/v2/Collections?$select=Name'
-const targetCollectionUrl = 'odata/v1/Synchronizers(:idL)/TargetCollection'
-const updateSynchUrl = 'odata/v1/Synchronizers(:idL)'
-const getSynchronizersUrl = 'odata/v2/Synchronizers';
+const synchUrl = '/odata/v1/Synchronizers'
+const collectionsUrl = '/odata/v2/Collections?$select=Name'
+const targetCollectionUrl = '/odata/v1/Synchronizers(:idL)/TargetCollection'
+const updateSynchUrl = '/odata/v1/Synchronizers(:idL)'
+const getSynchronizersUrl = '/odata/v2/Synchronizers';
 const getProductSourcesUrl = '/odata/v2/ProductSources';
 
 
@@ -51,7 +50,7 @@ exports.getAll = async (req, res, next) => {
 			}, requestTimeout);
 			const synch = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, synchUrl),
+				url: (new URL(service.service_url + synchUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -87,7 +86,7 @@ exports.getAll = async (req, res, next) => {
 					}, requestTimeout);
 					const tc = await axios({
 						method: 'get',
-						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						url: (new URL(service.service_url + targetCollectionUrl.replace(':id',element.Id))).href,
 						auth: {
 							username: service.username,
 							password: Utilcrypto.decrypt(service.password)
@@ -132,7 +131,7 @@ exports.getAll = async (req, res, next) => {
 			}, requestTimeout);
 			const collections = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, collectionsUrl),
+				url: (new URL(service.service_url + collectionsUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -220,7 +219,7 @@ exports.getAllFE = async (req, res, next) => {
 			}, requestTimeout);
 			const synch = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, synchUrl),
+				url: (new URL(service.service_url + synchUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -256,7 +255,7 @@ exports.getAllFE = async (req, res, next) => {
 					}, requestTimeout);
 					const tc = await axios({
 						method: 'get',
-						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						url: (new URL(service.service_url + targetCollectionUrl.replace(':id',element.Id))).href,
 						auth: {
 							username: service.username,
 							password: Utilcrypto.decrypt(service.password)
@@ -301,7 +300,7 @@ exports.getAllFE = async (req, res, next) => {
 			}, requestTimeout);
 			const collections = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, collectionsUrl),
+				url: (new URL(service.service_url + collectionsUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -389,7 +388,7 @@ exports.getAllBE = async (req, res, next) => {
 			}, requestTimeout);
 			const synch = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, synchUrl),
+				url: (new URL(service.service_url + synchUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -425,7 +424,7 @@ exports.getAllBE = async (req, res, next) => {
 					}, requestTimeout);
 					const tc = await axios({
 						method: 'get',
-						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						url: (new URL(service.service_url + targetCollectionUrl.replace(':id',element.Id))).href,
 						auth: {
 							username: service.username,
 							password: Utilcrypto.decrypt(service.password)
@@ -470,7 +469,7 @@ exports.getAllBE = async (req, res, next) => {
 			}, requestTimeout);
 			const collections = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, collectionsUrl),
+				url: (new URL(service.service_url + collectionsUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -558,7 +557,7 @@ exports.getAllSI = async (req, res, next) => {
 			}, requestTimeout);
 			const synch = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, synchUrl),
+				url: (new URL(service.service_url + synchUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -594,7 +593,7 @@ exports.getAllSI = async (req, res, next) => {
 					}, requestTimeout);
 					const tc = await axios({
 						method: 'get',
-						url: urljoin(service.service_url, targetCollectionUrl.replace(':id',element.Id)),
+						url: (new URL(service.service_url + targetCollectionUrl.replace(':id',element.Id))).href,
 						auth: {
 							username: service.username,
 							password: Utilcrypto.decrypt(service.password)
@@ -639,7 +638,7 @@ exports.getAllSI = async (req, res, next) => {
 			}, requestTimeout);
 			const collections = await axios({
 				method: 'get',
-				url: urljoin(service.service_url, collectionsUrl),
+				url: (new URL(service.service_url + collectionsUrl)).href,
 				auth: {
 					username: service.username,
 					password: Utilcrypto.decrypt(service.password)
@@ -758,7 +757,7 @@ exports.getAllSI = async (req, res, next) => {
 		}, requestTimeout);
 		const synchronizer = await axios({
 			method: 'post',
-			url: urljoin(service.service_url, synchUrl),
+			url: (new URL(service.service_url + synchUrl)).href,
 			auth: {
 				username: service.username,
 				password: Utilcrypto.decrypt(service.password)
@@ -866,7 +865,7 @@ exports.updateOne = async (req, res) => {
 		}, requestTimeout);
 		const synchronizer = await axios({
 			method: 'put',
-			url: urljoin(service.service_url, updateSynchUrl.replace(':id',req.params.id)),
+			url: (new URL(service.service_url + updateSynchUrl.replace(':id',req.params.id))).href,
 			auth: {
 				username: service.username,
 				password: Utilcrypto.decrypt(service.password)
@@ -953,7 +952,7 @@ exports.updateOne = async (req, res) => {
 		}, requestTimeout);
 		const synchronizer = await axios({
 			method: 'DELETE',
-			url: urljoin(service.service_url, updateSynchUrl.replace(':id',req.params.id)),
+			url: (new URL(service.service_url + updateSynchUrl.replace(':id',req.params.id))).href,
 			auth: {
 				username: service.username,
 				password: Utilcrypto.decrypt(service.password)

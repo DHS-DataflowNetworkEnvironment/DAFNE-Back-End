@@ -1,5 +1,5 @@
 const Sequelize = require('sequelize');
-const db = require('../util/database');
+const db = require('app/util/database');
 
 const Service_Type= db.define('service_type', {
 	id: {
@@ -12,6 +12,11 @@ const Service_Type= db.define('service_type', {
     type: Sequelize.STRING,
     allowNull: false,
     unique: true
+  },
+  supports_oauth2: {
+    allowNull: false,
+    type: Sequelize.BOOLEAN,
+    defaultValue: false
   },
   createdAt: {
     allowNull: false,

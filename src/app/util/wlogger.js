@@ -1,38 +1,62 @@
-var winston = require('winston'); require('winston-daily-rotate-file');
+const { createLogger, format, transports } = require('winston');
+const { combine, timestamp, label, printf } = format;
+require('winston-daily-rotate-file');
 const moment = require('moment');
-const conf = require('../util/config');
+const wloggerConfig = require('./config').getWloggerConfig();
+const dafneBackendVersion = require('./config').getVersion();
 const path = require('path');
 
 IsJsonString = (str) => typeof (str) == 'string' ? false : true;
 
-const logger = winston.createLogger({
-  level:conf.getConfig().logger.severity || "info",
-  format: winston.format.printf(
-    info => `[${conf.getVersion()}][${moment().format(conf.getLoggerDateFormat())}] [${(info.level.toUpperCase())}] ${IsJsonString(info.message) ? JSON.stringify(info.message) : info.message}`
+let isSeverityLevelValid = true;
+if (wloggerConfig.severity.toLowerCase() !== "info" && 
+    wloggerConfig.severity.toLowerCase() !== "debug" && 
+    wloggerConfig.severity.toLowerCase() !== "warning" && 
+    wloggerConfig.severity.toLowerCase() !== "error" ) {
+  isSeverityLevelValid = false;
+}
+
+const logFormat = printf(({ level, message, label, timestamp }) => {
+  return `[${timestamp}] [${dafneBackendVersion}] [${level}]: ${message}`;
+});
+
+const logger = createLogger({
+  level: (isSeverityLevelValid ? wloggerConfig.severity.toLowerCase() : "info"),
+  format: combine(
+    format(info => {
+      info.level = info.level.toUpperCase();
+      return info;
+    })(),
+    timestamp(),
+    logFormat
   ),
   transports: [
-    new (winston.transports.DailyRotateFile)({
-      filename: path.join(process.env.LOGS_PATH, conf.getConfig().logger.logname),
-      datePattern: (conf.getConfig().logger.datePattern) ? conf.getConfig().logger.datePattern : 'YYYY-MM-DD',
-      zippedArchive: conf.getConfig().logger.zippedArchive, //if zips it doesn't delete files
-      maxSize: conf.getConfig().logger.maxSize,
-      maxFiles: conf.getConfig().logger.maxFiles,
-      createSymlink: (conf.getConfig().logger.createSymlink) ? conf.getConfig().logger.createSymlink : true,
-      symlinkName: (conf.getConfig().logger.symlinkName) ? conf.getConfig().logger.symlinkName : 'dafne-be.log'
-    }),
-    
+    new (transports.DailyRotateFile)({
+      filename: path.join(process.env.LOGS_PATH, wloggerConfig.logname),
+      datePattern: (wloggerConfig.datePattern) ? wloggerConfig.datePattern : 'YYYY-MM-DD',
+      zippedArchive: wloggerConfig.zippedArchive, //if zips it doesn't delete files
+      maxSize: wloggerConfig.maxSize,
+      maxFiles: wloggerConfig.maxFiles,
+      createSymlink: (wloggerConfig.createSymlink) ? wloggerConfig.createSymlink : true,
+      symlinkName: (wloggerConfig.symlinkName) ? wloggerConfig.symlinkName : 'dafne-be.log'
+    })
   ]
 });
 
 // Log on console if not in production mode  
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.printf(info => `[${conf.getVersion()}][${moment().format(conf.getLoggerDateFormat())}] [${info.level}] ${IsJsonString(info.message) ? JSON.stringify(info.message) : info.message}`)
-    )
+  logger.add(new transports.Console({
+    format: combine(
+      format(info => {
+        info.level = info.level.toUpperCase();
+        return info;
+      })(),
+      format.colorize({all: true}),
+      timestamp(),
+      logFormat
+    ),
+    level: "debug"
   }));
 }
-
 
 module.exports = logger;
