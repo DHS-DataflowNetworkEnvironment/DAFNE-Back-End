@@ -1,36 +1,36 @@
 version: "3.1"
 services:
-  be:
-    image: "aliaspace/dafne:be-4.0.0"
-    container_name: be
-    hostname: backend
-    restart: always
-    build: .
-    command: bash -c "npx sequelize-cli db:migrate && node index.js"
+#  be:
+#    image: "aliaspace/dafne:be-2.0.0"
+#    container_name: be
+#    hostname: backend
+#    restart: always
+#    build: .
+#    command: bash -c "npx sequelize-cli db:migrate && node index.js"
 
-    ports:
-      - "3000:2000"
-    environment:
-      - NODE_ENV=production               # {'development', 'test', 'production'}
-      - CONF_PATH=/usr/src/app/config/
-      - LOGS_PATH=/usr/src/app/logs/
-    networks:
-      - dafne
-    volumes:
+#    ports:
+#      - "3000:2000"
+#    environment:
+#      - NODE_ENV=production               # {'development', 'test', 'production'}
+#      - CONF_PATH=/usr/src/app/config/
+#      - LOGS_PATH=/usr/src/app/logs/
+#    networks:
+#      - dafne
+#    volumes:
       # create a 'config' folder in the working dir and bind it to an external folder of the host, where the config.json file is located
-      - /data/dafne/back-end/config:/usr/src/app/config
+#      - /data/dafne/back-end/config:/usr/src/app/config
       # create a 'log' folder in the working dir and binds it to an external folder of the host, to make the logs persistent
-      - /data/dafne/back-end/logs:/usr/src/app/logs
-    depends_on:
-      - db
+#      - /data/dafne/back-end/logs:/usr/src/app/logs
+#    depends_on:
+#      - db
   # DB
   db:
-    container_name: dafne_db
+    container_name: db
     hostname: dafne_db
     restart: always
     image: "library/postgres:12.5"
     env_file:
-      - /data/dafne/back-end/config/db_credentials.env
+      - ../config/db_credentials.env
     networks:
       - dafne
     ports:
