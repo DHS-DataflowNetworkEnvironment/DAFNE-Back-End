@@ -1,5 +1,5 @@
-const wlogger = require('../util/wlogger');
-const conf = require('../util/config');
+const wlogger = require('app/util/wlogger');
+const conf = require('app/util/config');
 
 /** [GET] /config/availability/rollingPeriodInDays
  *   Return the configured availability rollingPeriodInDays 
@@ -14,16 +14,16 @@ exports.availabilityRollingPeriod = async (req, res) => {
   }
 };
 
-/** [GET] /config/latency/rollingPeriodInDays
- *   Return the configured latency rollingPeriodInDays 
+/** [GET] /config/timeliness/rollingPeriodInDays
+ *   Return the configured timeliness rollingPeriodInDays 
  */
-exports.latencyRollingPeriod = async (req, res) => {
+exports.timelinessRollingPeriod = async (req, res) => {
   try {
-    rollingPeriodInDays = (conf.getConfig().latency && conf.getConfig().latency.rollingPeriodInDays) ? conf.getConfig().latency.rollingPeriodInDays : 90;
+    rollingPeriodInDays = (conf.getConfig().timeliness && conf.getConfig().timeliness.rollingPeriodInDays) ? conf.getConfig().timeliness.rollingPeriodInDays : 90;
     return res.status(200).json(rollingPeriodInDays);    
   } catch (error) {
-    wlogger.error("Generic error in configured latency rollingPeriodInDays : " + error);
-    return res.status(500).json('Error getting configured latency rollingPeriodInDays');
+    wlogger.error("Generic error in configured timeliness rollingPeriodInDays : " + error);
+    return res.status(500).json('Error getting configured timeliness rollingPeriodInDays');
   }
 };
 

@@ -1,8 +1,7 @@
-const wlogger = require('../util/wlogger');
-const conf = require('../util/config');
 const axios = require('axios');
-const urljoin = require('url-join');
-const Utilcrypto = require('../util/Utilcrypto');
+const wlogger = require('app/util/wlogger');
+const conf = require('app/util/config');
+const Utilcrypto = require('app/util/utilcrypto');
 
 const regex_substring = /^.*substringof\(\s*?'(.*)'\s*?,\s*?Name\s*?\).*/gm;
 const regex_startswith = /^.*startswith\(\s*?Name\s*?,\s*?'(.*)'\s*?\).*/gm;
@@ -202,7 +201,7 @@ exports.performDHuSServiceRequest = async (service, requestUrl) => {
   }, requestTimeout);
   const response = await axios({
     method: 'get',
-    url: urljoin(service.service_url, requestUrl),
+    url: (new URL(service.service_url + requestUrl)).href,
     auth: {
       username: service.username,
       password: Utilcrypto.decrypt(service.password)

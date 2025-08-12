@@ -1,7 +1,7 @@
 //SRP: Database connection util
 const Sequelize = require('sequelize');
-const wlogger = require('../util/wlogger');
-const dbParams = require('../util/config').getDatabaseConfig();
+const wlogger = require('./wlogger');
+const dbParams = require('./config').getDatabaseConfig();
 
 const sequelize = new Sequelize(
     dbParams.database,

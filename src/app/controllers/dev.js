@@ -1,7 +1,7 @@
-const sequelize = require('../util/database');
-const wlogger = require('../util/wlogger');
-const conf = require('../util/config');
 const path = require('path');
+const sequelize = require('app/util/database');
+const wlogger = require('app/util/wlogger');
+const conf = require('app/util/config');
 
 // [GET] ../dev/version
 exports.getVersion = (req, res, next) => {

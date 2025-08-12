@@ -1,7 +1,4 @@
-FROM node:12
-
-# external port
-# EXPOSE 3000
+FROM node:slim
 
 WORKDIR /usr/src/app/
 
@@ -15,5 +12,3 @@ RUN npm cache clean --force
 RUN mkdir uploads
 
 COPY . . 
-
-#CMD [ "node", "index.js" ]

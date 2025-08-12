@@ -54,8 +54,9 @@ module.exports = {
     }).then(() => queryInterface.addIndex('centres', ['id']))
     .then(() => queryInterface.addIndex('centres', ['name']))
     .then(() => queryInterface.addIndex('centres', ['local']))
-    .then(() => queryInterface.addConstraint('centres', ['local'], {
+    .then(() => queryInterface.addConstraint('centres', {
       type: 'check',
+      fields: ['local'],
       where: {
         local: true
       }

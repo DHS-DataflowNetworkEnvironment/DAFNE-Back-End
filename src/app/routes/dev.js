@@ -1,4 +1,4 @@
-const controller = require('../controllers/dev');
+const controller = require('app/controllers/dev');
 const router = require('express').Router();
 
 router.get('/version', controller.getVersion);

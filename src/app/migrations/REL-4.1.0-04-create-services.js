@@ -18,8 +18,7 @@ module.exports = {
       },
       service_url: {
         type: Sequelize.STRING,
-        allowNull: false,
-		    unique: true
+        allowNull: false
       },
       service_type: {
         type: Sequelize.INTEGER,
@@ -37,6 +36,14 @@ module.exports = {
           model: 'centres',
           key: 'id'
         }
+      },
+      token_url: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      client_id: {
+        type: Sequelize.STRING,
+        allowNull: true
       },
       createdAt: {
         allowNull: false,
