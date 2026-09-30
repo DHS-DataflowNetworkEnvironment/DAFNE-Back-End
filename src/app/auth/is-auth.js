@@ -43,7 +43,7 @@ module.exports = async (req, res, next) => {
   let timeout;
   //4 Check if the token is valid in Keycloak
   try {
-    wlogger.info(`Verify authentication for user : ${decodedToken.sub}`);
+    //wlogger.info(`Verify authentication for user : ${decodedToken.sub}`);
     //Capture
     const source = axios.CancelToken.source();
     let requestTimeout = (conf.requestTimeout) ? conf.requestTimeout : 30000;
@@ -65,11 +65,11 @@ module.exports = async (req, res, next) => {
     
     // Clear The Timeout
     clearTimeout(timeout);
-    wlogger.info(`Token validity status for user '${decodedToken.sub}': ${result.status}`);
+    //wlogger.info(`Token validity status for user '${decodedToken.sub}': ${result.status}`);
     if (result.status != 200) {
       if (result.status == 401) {
         // Refresh token
-        wlogger.info("Trying to refresh user token..");
+        //wlogger.info("Trying to refresh user token..");
         const refreshRes = await auth.refreshUserToken(decodedToken.sub);
         if (refreshRes.status === 500) {
           wlogger.info("Could not refresh token.")

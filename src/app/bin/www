@@ -44,12 +44,10 @@ var server = http.createServer(app);
       scheduleAvailability.createPurgeScheduler();
       scheduleTimeliness.createScheduler();
       scheduleTimeliness.createPurgeScheduler();
-      scheduleTimeliness.createFeRetryScheduler();
       setInterval(function() {
         scheduleAvailability.checkAndUpdateScheduler();
         scheduleTimeliness.checkAndUpdateScheduler();
-        scheduleTimeliness.checkAndUpdateFeRetryScheduler();
-      }, 60000);  //TODO: replace with cfg param. At present check for new availability schedule every minute
+      }, 60000);  //TODO: replace with cfg param. At present check for new availability or timeliness schedule every minute
     } else {
       wlogger.error('dbParams.username' + dbParams.username);
     }
@@ -57,7 +55,6 @@ var server = http.createServer(app);
      wlogger.error("Error in www file: " + error)
   }
 })();
-//server.listen(port);
 server.on('error', onError);
 server.on('listening', onListening);
 

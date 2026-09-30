@@ -25,11 +25,17 @@ router.get('/:id/rolling', isAuth, controller.getRolling);
 //READ ONE CENTRE Archive Info -> [GET] ../centres/id/datasourcesinfo
 router.get('/:id/datasourcesinfo', isAuth, controller.getDataSourcesInfo);
 
+//READ ONE CENTRE DHS Connected -> [GET] ../centres/id/dhsconnected
+router.get('/:id/dhsconnected', isAuth, controller.getDhsConnected);
+
+//[GET] ../centres/id/datasourcesinfo
+router.get('/:id/datasourcesinfo', isAuth, controller.getDataSourcesInfo);
+
 //[GET] ../centres/id/map/datasourcesinfo
 router.get('/:id/map/datasourcesinfo', isAuth, controller.getMapDataSourcesInfo);
 
 //[GET] ../centres/id/map/dhsconnected
-router.get('/:id/map/dhsconnected', isAuth, controller.getMapDhsConnected);
+router.get('/:id/map/dhsconnected', isAuth, controller.getDhsConnected);
 
 //[POST] ../centres/id/service/availability
 router.post('/:id/service/availability', isAuth, controller.computeAvailability);

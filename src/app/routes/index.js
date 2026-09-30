@@ -3,7 +3,7 @@ var router = express.Router();
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
-  res.render('index', { title: 'DAFNE BackEnd' });
+  res.render('index', { title: 'DAFNE Back End' });
 });
 
 module.exports = router;

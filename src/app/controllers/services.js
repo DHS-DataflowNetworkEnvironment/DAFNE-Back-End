@@ -7,8 +7,8 @@ const Utilcrypto = require('app/util/utilcrypto');
 const utility = require('app/util/utility');
 const service_token = require('app/services/service_token');
 
-const getSynchronizersUrl = 'odata/v2/Synchronizers';
-const getProductSourcesUrl = '/odata/v2/ProductSources';
+const getSynchronizersUrl = 'Synchronizers';
+const getProductSourcesUrl = '/ProductSources';
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -36,12 +36,13 @@ exports.createOne = async (req, res, next) => {
 			username: req.body.username,
 			password: Utilcrypto.encrypt(req.body.password), //Encypted by default
 			service_url: req.body.service_url,
+      service_admin_url: req.body.service_admin_url,
 			token_url: req.body.token_url,
 			client_id: req.body.client_id,
 			service_type: req.body.service_type,
 			centre: req.body.centre,
 		});
-		wlogger.debug({ "createOne Service: ": service.service_url });
+		wlogger.info({ "createOne Service: ": service.service_url });
 		return res.status(201).json(service);
 	} catch (error) {
 		wlogger.error({ "ERROR createOne Service:": error });
@@ -107,7 +108,7 @@ exports.updateOne = async (req, res) => {
 			delete S.password;
 		}
 		const s = await Service.update(S, { where: { id: req.params.id } });
-		wlogger.log({ level: 'info', message: { "OK updateOne Service: ": s } });
+		wlogger.info({"OK updateOne Service: ": s});
 
 		// removing eventually saved token
 		if (S.token_url && S.token_url !== '') {
@@ -133,7 +134,7 @@ exports.deleteOne = async (req, res) => {
 	try {
 		wlogger.debug("deleteOne: [DELETE] /services/:id");
 		const S = await Service.destroy({ where: { id: req.params.id } });
-		wlogger.debug({ "OK deleteOne Service: ": S });
+		wlogger.info({ "OK deleteOne Service: ": S });
 
 		// removing eventually saved token
 		if (S.token_url && S.token_url !== '') {
@@ -143,57 +144,6 @@ exports.deleteOne = async (req, res) => {
 		return res.status(200).json(S);
 	} catch (error) {
 		wlogger.error({ "ERROR getdeleteOneOne Service: ": error });
-		wlogger.error(error);
-		return res.status(500).json(error);
-	}
-};
-
-
-/** [GET] /services/1/synchronizers
- * 	GET ONE
- *
- * 	@param {string} req.params.id id of the service to get
- *
- * 	@returns {Synchronizers} List of Synchronizers of the service with the id requested
- */
- exports.getSynchronizers = async (req, res) => {
-	wlogger.debug("getSynchronizers: [GET] /services/:id/synchronizers");
-	try {
-		const s = await Service.findByPk(req.params.id);
-		const synchList = await utility.performDHuSServiceRequest(s, getSynchronizersUrl);
-		if(synchList && synchList.status == 200 && synchList.data ) { 
-			return res.status(200).json(synchList.data.value);
-		} else {
-			return res.status(500).json("Error Getting Synchronizers list");
-		}		
-	} catch (error) {
-		wlogger.error({ "ERROR getSynchronizers Service: ": error });
-		wlogger.error(error);
-		return res.status(500).json(error);
-	}
-};
-
-/** [GET] /services/1/synchronizers/intelligentSyncSupport
- *
- * 	@param {string} req.params.id id of the service to get
- *
- * 	@returns {boolean} if intelligent synchronizers are supported or not
- */
- exports.geIntelligentSyncSupport = async (req, res) => {
-	wlogger.debug("geIntelligentSyncSupport: [GET] /services/:id/synchronizers/intelligentSyncSupport");
-	try {
-		const s = await Service.findByPk(req.params.id);
-		const sources = await utility.performDHuSServiceRequest(s, getProductSourcesUrl);
-		wlogger.debug("geIntelligentSyncSupport - Product Sources HTTP response");
-		//console.log(sources);
-		// Get info from odata/v1 synchronizers
-		if (sources && sources.status == 404) {
-			return res.status(200).json(false);
-		} else {
-			return res.status(200).json(true);
-		}			
-	} catch (error) {
-		wlogger.error({ "ERROR geIntelligentSyncSupport Service: ": error });
 		wlogger.error(error);
 		return res.status(500).json(error);
 	}

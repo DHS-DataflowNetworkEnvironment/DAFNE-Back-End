@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize');
 const db = require('app/util/database');
 
-const PublicationTimeliness = db.define('publication_latency', {
+const PublicationTimeliness = db.define('publication_timeliness', {
 	id: {
     type: Sequelize.BIGINT,
     autoIncrement: true,
@@ -12,40 +12,24 @@ const PublicationTimeliness = db.define('publication_latency', {
     type: Sequelize.DATE,
     allowNull: false
   },
-  backend_url: {
-    type: Sequelize.STRING,
-    allowNull: false
-  },
-  frontend_url: {
-    type: Sequelize.STRING,
-    allowNull: true
-  },
   centre_id: {
     type: Sequelize.INTEGER,
     allowNull: false
   },
-  synch_id: {
-    type: Sequelize.INTEGER,
-    allowNull: false
-  },
-  synch_label: {
+  local_url: {
     type: Sequelize.STRING,
     allowNull: false
   },
-  synch_filter: {
+  filter_label: {
     type: Sequelize.STRING,
-    allowNull: true
+    allowNull: false
   },
-  synch_geo_filter: {
-    type: Sequelize.STRING,
+  filter: {
+    type: Sequelize.TEXT,
     allowNull: true
   },
   source_url: {
     type: Sequelize.STRING,
-    allowNull: false
-  },
-  source_last_creation_date: {
-    type: Sequelize.DATE,
     allowNull: false
   },
   product_name: {
@@ -56,23 +40,15 @@ const PublicationTimeliness = db.define('publication_latency', {
     type: Sequelize.STRING,
     allowNull: true
   },
-  creation_date_be: {
+  publication_date_local: {
     type: Sequelize.DATE,
     allowNull: true
   },
-  creation_date_fe: {
+  publication_date_source: {
     type: Sequelize.DATE,
     allowNull: true
   },
-  creation_date_source: {
-    type: Sequelize.DATE,
-    allowNull: true
-  },
-  latency_be: {
-    type: Sequelize.BIGINT,
-    allowNull: true
-  },
-  latency_fe: {
+  timeliness: {
     type: Sequelize.BIGINT,
     allowNull: true
   },
@@ -82,7 +58,7 @@ const PublicationTimeliness = db.define('publication_latency', {
     defaultValue: 1
   },
   description: {
-    type: Sequelize.STRING,
+    type: Sequelize.TEXT,
     allowNull: true
   },
   createdAt: {
@@ -96,23 +72,20 @@ const PublicationTimeliness = db.define('publication_latency', {
     defaultValue: Date.now()
   }
 }, {
-	tableName: 'publication_latency'
+	tableName: 'publication_timeliness'
 }, {
 	indexes:[{
 		unique: false,
 		fields: ['timestamp']
 	},{
 		unique: false,
-		fields: ['latency_fe']
+		fields: ['timeliness']
 	},{
 		unique: false,
-		fields: ['latency_be']
+		fields: ['source_url']
 	},{
 		unique: false,
-		fields: ['synch_id']
-	},{
-		unique: false,
-		fields: ['synch_label']
+		fields: ['filter_label']
 	}]
 });
   

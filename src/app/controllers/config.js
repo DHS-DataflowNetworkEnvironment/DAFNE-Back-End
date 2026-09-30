@@ -27,4 +27,15 @@ exports.timelinessRollingPeriod = async (req, res) => {
   }
 };
 
-
+/** [GET] /config/getClientId
+ *  Return the configurated clientId to the front-end
+ */
+exports.clientId = async (req, res) => {
+  try {
+    clientId = (conf.getConfig().auth && conf.getConfig().auth.clientId) ? conf.getConfig().auth.clientId : "dafne";
+    return res.status(200).json(clientId);
+  } catch (error) {
+    wlogger.error("Generic error in configured clientId : " + error);
+    return res.status(500).json('Error getting configured clientId');
+  }
+}

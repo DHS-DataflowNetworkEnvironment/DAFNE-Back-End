@@ -20,6 +20,10 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false
       },
+      service_admin_url: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
       service_type: {
         type: Sequelize.INTEGER,
         allowNull: false,
