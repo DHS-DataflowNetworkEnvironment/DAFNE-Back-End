@@ -21,6 +21,11 @@ const Service = db.define('Service', {
         allowNull: false,
         unique: true
     },
+    service_admin_url: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: true
+    },
     token_url: {
         type: Sequelize.STRING,
         allowNull: true,

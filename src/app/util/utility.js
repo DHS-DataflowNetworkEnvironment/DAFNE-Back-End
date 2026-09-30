@@ -2,6 +2,8 @@ const axios = require('axios');
 const wlogger = require('app/util/wlogger');
 const conf = require('app/util/config');
 const Utilcrypto = require('app/util/utilcrypto');
+const service_token = require('app/services/service_token');
+const util = require('util');
 
 const regex_substring = /^.*substringof\(\s*?'(.*)'\s*?,\s*?Name\s*?\).*/gm;
 const regex_startswith = /^.*startswith\(\s*?Name\s*?,\s*?'(.*)'\s*?\).*/gm;
@@ -93,7 +95,7 @@ exports.capitalizeFirstLetter = string => {
   return string.toLowerCase().charAt(0).toUpperCase() + string.toLowerCase().slice(1);
 }
 
-exports.parseODataFilter = str  => {
+exports.parseODataFilter = str => {
   let filter = '';
   let res;
   wlogger.debug('Odata filter to parse: ' + str);
@@ -192,40 +194,59 @@ exports.getDatesList = (start, stop)  => {
 
 
 exports.performDHuSServiceRequest = async (service, requestUrl) => {
-  const source = axios.CancelToken.source();
   let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
+  const controller = new AbortController();
   let timeout = setTimeout(() => {
-    source.cancel();
-    wlogger.error("No response received from Service " + service.service_url + " - requestURL: " + requestUrl); 
+    if (!controller.signal.aborted) {
+      controller.abort();
+    }
+    wlogger.error("No response received from Service while managing an Ingester. " + service.service_url); 
     wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
   }, requestTimeout);
-  const response = await axios({
-    method: 'get',
-    url: (new URL(service.service_url + requestUrl)).href,
-    auth: {
-      username: service.username,
-      password: Utilcrypto.decrypt(service.password)
-    },
-    validateStatus: false,
-    cancelToken: source.token
-  }).catch(err => {
-    if (err.response) {
-    // client received an error response (5xx, 4xx)
-    wlogger.error("Received error response from Service " + service.service_url); 
-    wlogger.error(err);
-    } else if (err.request) {
-    // client never received a response, or request never left
-    wlogger.error("No response received from Service " + service.service_url); 
-    wlogger.error(err);
+  try {
+    const url = new URL(service.service_url + requestUrl);
+    wlogger.debug("performDHuSServiceRequest - Performing request to " + url.href);
+    let authObj = {};
+    if (service.service_type === 8) {
+      const serviceToken = await service_token.getServiceToken(service);
+      const bearer = serviceToken.access_token;
+      wlogger.debug("performDHuSServiceRequest - Got Auth token from service: " + service.service_url);
+      authObj = {
+        'Authorization': 'Bearer '+ bearer
+      }
     } else {
-    // anything else
-    wlogger.error("Error from Service " + service.service_url); 
-    wlogger.error(err);
+      wlogger.debug("performDHuSServiceRequest - No Authorization needed for service: " + service.service_url);
     }
-  });
-  // Clear The Timeout
-  clearTimeout(timeout);
-  return response;
+    
+    const response = await axios({
+      method: 'get',
+      url: url.href,
+      headers: authObj,
+      signal: controller.signal,
+      data: {}
+    }).catch(err => {
+      if (err && err.response) {
+        wlogger.error("Received error response from Service " + service.service_url);
+        wlogger.error("Status: " + err.response.status + " - Data: " + JSON.stringify(err.response.data, null, 2));
+      } else if (err && err.request) {
+        wlogger.error("No response received from Service " + service.service_url);
+        wlogger.error("Request info: " + JSON.stringify({ headers: err.request && err.request._header ? err.request._header : undefined, path: err.request && err.request.path ? err.request.path : undefined }, null, 2));
+      } else if (err) {
+        wlogger.error("Error from Service " + service.service_url + " - " + (err.message || JSON.stringify(err, null, 2)));
+      }
+      return null;
+    });
+    // Clear The Timeout
+    clearTimeout(timeout);
+    return response.data ? response.data : response;
+  } catch (err) {
+    clearTimeout(timeout);  
+    if (axios.isCancel(err) || err.name === 'CanceledError') {
+      return;
+    }
+    wlogger.error("ERROR performing DHuS service request: " + err);
+    return err;
+  }
 }
 
 /* Get Referenced Source with greatest LastCreationDate*/

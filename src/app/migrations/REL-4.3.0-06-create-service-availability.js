@@ -12,6 +12,10 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false
       },
+      service_admin_url: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
       centre_id: {
         type: Sequelize.INTEGER,
         allowNull: false

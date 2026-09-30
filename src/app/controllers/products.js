@@ -12,34 +12,17 @@ const wlogger = require('app/util/wlogger');
 const conf = require('app/util/config');
 const service_token = require('app/services/service_token');
 
-const productsUrl_odata_v1 = "/odata/v1/Products/$count?$filter=startswith(Name,':mission') and substringof(':type',Name) and CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
-const productsUrl_odata_v4 = "/odata/v1/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json";
-const productsUrl_odata_v4_GSS = "/odata/v2/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json";
 // Completeness URL
-const productsFilterUrl = "/odata/v1/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
-const productsFilterUrl_GSS = "/odata/v2/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
+//const productsUrl_odata_v1 = "/Products/$count?$filter=startswith(Name,':mission') and substringof(':type',Name) and CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
+const productsUrl_odata_v4 = "/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json";
+const productsUrl_odata_v4_GSS = "/Products?$filter=startswith(Name,':mission') and contains(Name,':type') and PublicationDate ge :dateT00:00:00.000Z and PublicationDate le :dateT23:59:59.999Z&$count=true&$top=1&$format=json";
+// Completeness with filter URL
+const productsFilterUrl = "/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
+const productsFilterUrl_GSS = "/Products/$count?$filter=:filter CreationDate ge datetime':dateT00:00:00.000' and CreationDate le datetime':dateT23:59:59.999'";
 
 
 //Compute products completeness related to provided filters for all centres
 // For all authenticated users
-/* Request body example:
- * {
- 	"mission":"S1A",
-	"productType":"GRD",
-	"startDate":"2021-11-05",
-	"stopDate":"2021-11-06"
- * }
-   Response example
-   [
-	{
-		"date": "2021-11-01",
-		"values": [
-			{ "id": 1, "name": "ASI", "color": "#ff0000", "local": true, "value": 300 },
-			{ "id": 2, "name": "Airbus", "color": "#ff0000", "local": false, "value": 300 },
-		]
-	}
-   ]
-*/
 exports.computeCompleteness = async (req, res, next) => {
 	let completeness = [];
 		
@@ -64,12 +47,12 @@ exports.computeCompleteness = async (req, res, next) => {
 			
 			try {
 				let tempDate;
-				// Get the FE ,Single Instance, CDSE, CDSE OAuth2, PRIP, LTA or GSS services of each centre
+				// Get the CDSE or GSS services of each centre
 				const service = await Service.findOne({
 					where: {
 						centre: centre.id,
 						service_type: {
-							[Sequelize.Op.in]: [1, 2, 4, 5, 6, 7, 8]  //Exclude BE services from completeness computation and substringof('A',Name) 
+							[Sequelize.Op.in]: [4, 8] // limit to CDSE or GSS types
 						}
 					}
 				});
@@ -91,7 +74,8 @@ exports.computeCompleteness = async (req, res, next) => {
 						}
 						if (serviceToken && serviceToken.hasOwnProperty('access_token')) {
 							tempServiceTokenIsOk = true;
-							wlogger.debug("Got token.");
+							//wlogger.debug("Got token.");
+              //wlogger.debug("Service token: " + JSON.stringify(serviceToken, null, 2));
 						} else {
 							wlogger.error("Could not get token for service with token url: " + service.token_url + " serviceToken is not valid.");
 						}						
@@ -104,19 +88,15 @@ exports.computeCompleteness = async (req, res, next) => {
 						let timeout;
 						try {
 							let requestUrl;
-							if (service.service_type < 4) {
-								requestUrl = productsUrl_odata_v1.replace(':mission', mission).replace(':type', productType);
-							} else {
-								if (supportsOAuth2 == true) {
-									if (service.service_type == 8) {
-										requestUrl = productsUrl_odata_v4_GSS.replace(':mission', mission).replace(':type', productType);
-									} else {
-										requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
-									}
-								} else {
-									requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
-								}
-							}
+              if (supportsOAuth2 == true) {
+                if (service.service_type === 8) {
+                  requestUrl = productsUrl_odata_v4_GSS.replace(':mission', mission).replace(':type', productType);
+                } else {
+                  requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
+                }
+              } else {
+                requestUrl = productsUrl_odata_v4.replace(':mission', mission).replace(':type', productType);
+              }
 							requestUrl = requestUrl.replace(/:date/g, date);
 							wlogger.debug("Current requestUrl: " + new URL(service.service_url + requestUrl).href);
 							const source = axios.CancelToken.source();
@@ -131,6 +111,7 @@ exports.computeCompleteness = async (req, res, next) => {
 							let count = {};
 							if (supportsOAuth2 == true) {
 								if (tempServiceTokenIsOk) {
+                  wlogger.debug("Using OAuth2 token for service: " + service.service_url);
 									count = await axios({
 										method: 'get',
 										url: (new URL(service.service_url + requestUrl)).href,
@@ -211,8 +192,6 @@ exports.computeCompleteness = async (req, res, next) => {
                       wlogger.error(err);
                       }
                     });
-                    //wlogger.debug("Count:");
-                    //wlogger.debug(count);
                   }
 								} catch (error) {
 									count.status = 400;
@@ -230,7 +209,7 @@ exports.computeCompleteness = async (req, res, next) => {
 								}
 							} else {
 								wlogger.error("count.status != 200: " + count.status);
-                //return res.status(count.status).json("Please check service settings");
+                wlogger.error("count.data: " + JSON.stringify(count.data, null, 2));
                 count.status = 400;
 								count.data = -99;
 								value = { "id": centre.id, "name": centre.name, "color": centre.color, "local": centre.local, "value": count.data };
@@ -282,25 +261,8 @@ exports.computeCompleteness = async (req, res, next) => {
 	}
 };
 
-//Compute products completeness related to provided sync filter for all centres
+//Compute products completeness related to provided filter for all centres
 // For all authenticated users
-/* Request body example:
- * {
- 	"filter":"substringof('_MSI', Name)",
-	"startDate":"2021-11-05",
-	"stopDate":"2021-11-06"
- * }
-   Response example
-   [
-	{
-		"date": "2021-11-01",
-		"values": [
-			{ "id": 1, "name": "ASI", "color": "#ff0000", "local": true, "value": 300 },
-			{ "id": 2, "name": "Airbus", "color": "#ff0000", "local": false, "value": 300 },
-		]
-	}
-   ]
-*/
 exports.computeFilterCompleteness = async (req, res, next) => {
 	let completeness = [];
 		
@@ -324,12 +286,12 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 
 		for (const centre of centres) {
 			try {
-				// Get the FE or Single Instance services of each centre
+				// Get the services of each centre
 				const service = await Service.findOne({
 					where: {
 						centre: centre.id,
 						service_type: {
-							[Sequelize.Op.in]: [1, 2, 4, 5, 6, 7, 8]  //Exclude BE services from completeness computation
+							[Sequelize.Op.in]: [4, 8]
 						}
 					}
 				});
@@ -357,19 +319,11 @@ exports.computeFilterCompleteness = async (req, res, next) => {
 						let timeout;
 						try {
 							let requestUrl = "";
-							if (service.service_type < 4) {
-								requestUrl = productsFilterUrl.replace(':filter', filter);
-							} else {
-								if (supportsOAuth2 == true) {
-									if (service.service_type == 8) {
-										requestUrl = productsFilterUrl_GSS.replace(':filter', filter);
-									} else {
-										requestUrl = productsFilterUrl.replace(':filter', filter);
-									}
-								} else {
-									requestUrl = productsFilterUrl.replace(':filter', filter);
-								}
-							}
+              if (service.service_type === 8) {
+                requestUrl = productsFilterUrl_GSS.replace(':filter', filter);
+              } else {
+                requestUrl = productsFilterUrl.replace(':filter', filter);
+              }
 							requestUrl = requestUrl.replace(/:date/g, date);
 							wlogger.debug("current requestUrl");
 							wlogger.debug(new URL(service.service_url + requestUrl).href);

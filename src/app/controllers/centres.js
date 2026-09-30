@@ -9,12 +9,13 @@ const Utilcrypto = require('app/util/utilcrypto');
 const utility = require('app/util/utility');
 const wlogger = require('app/util/wlogger');
 const conf = require('app/util/config');
+const ingestersController = require('app/controllers/ingesters');
 
-const evictionUrl = '/odata/v2/Evictions';
-const synchUrl = '/odata/v1/Synchronizers';
-const selectSynchUrl = '/odata/v1/Synchronizers?$select=ServiceUrl,Status';
-const productSourcesUrl = '/odata/v2/ProductSources';
-const intelliSynchUrl = '/odata/v2/Synchronizers?$expand=ReferencedSources';
+const evictionUrl = '/Evictions';
+const synchUrl = '/Synchronizers';
+const selectSynchUrl = '/Synchronizers?$select=ServiceUrl,Status';
+const productSourcesUrl = '/ProductSources';
+const intelliSynchUrl = '/Synchronizers?$expand=ReferencedSources';
 
 /*******************************************************
  * CRUD CONTROLLERS																		 *
@@ -46,7 +47,7 @@ exports.createOne = async (req, res, next) => {
 			icon: req.body.icon,
 			color: req.body.color
 		});
-		wlogger.debug({ "createOne Centre: ": centre });
+		wlogger.info({ "createOne Centre: ": centre });
 		return res.status(201).json(centre);
 	} catch (error) {
 		wlogger.error({ "ERROR createOne Centre:": error });
@@ -99,7 +100,7 @@ exports.getOne = async (req, res) => {
  */
 exports.updateOne = async (req, res) => {
 	try {
-		wlogger.debug("updateOne: [PUT] /centres/:id");
+		wlogger.info("updateOne: [PUT] /centres/:id");
 		const reqCentre = req.body; //Centre
 		const centre = await Centre.update(reqCentre, { where: { id: req.params.id } });
 		wlogger.log({ level: 'info', message: { "OK updateOne Centre: ": centre } });
@@ -122,10 +123,10 @@ exports.deleteOne = async (req, res) => {
 	try {
 		wlogger.debug("deleteOne: [DELETE] /centres/:id");
 		await Service.destroy({ where: { centre: req.params.id }, transaction: t });
-		wlogger.debug({ "deleted services of centre: ": req.params.id });
+		wlogger.info({ "deleted services of centre: ": req.params.id });
 		const centre = await Centre.destroy({ where: { id: req.params.id }, transaction: t });
 		await t.commit();
-		wlogger.debug({ "OK deleteOne Centre: ": centre });
+		wlogger.info({ "OK deleteOne Centre: ": centre });
 		return res.status(200).json(centre);
 	} catch (error) {
 		wlogger.error({ "ERROR getdeleteOneOne Centre: ": error });
@@ -133,6 +134,30 @@ exports.deleteOne = async (req, res) => {
 		return res.status(500).json(error);
 	}
 };
+
+/** [GET] /local-centre
+ * 	GET LOCAL CENTRE
+ *
+ * 	@returns {Centre} the centre with local == true
+ */
+exports.getLocalCentreName = async (req, res) => {
+  //wlogger.debug("getLocalCentre: [GET] /local-centre");
+	try {
+		const centre = await Centre.findOne({
+      where: {
+        local: true
+      }
+    });
+    if (!centre) {
+      return res.status(404).json({ message: 'There is no local centre set' });
+    }
+    const centreName = centre.dataValues.name;
+		return centreName;
+	} catch (error) {
+		wlogger.error({ "ERROR getOne USER: ": error });
+		return res.status(500).json(error);
+	}
+}
 
 getFakeRolling = () => {
     let obj = [];
@@ -153,84 +178,58 @@ getFakeDataSourcesInfo = () => {
 };
 
 /** [GET] /centres/1/rolling
- * 	GET rolling info. Please consider that this information comes from single instances or FE-Only instances
+ * 	GET rolling info.
  *
  * 	@param {string} req.params.id id of the centre to get
  *
  * 	@returns {JSON} JSON Array with the list of rolling policies
  */
- exports.getRolling = async (req, res) => {
+ exports.getRolling = async (req, res, next) => {
 	wlogger.debug("getRolling: [GET] /centres/:id/rolling");
 	
 	try {
-		let rollingInfo = [];
-		let cleanRollingInfo;
-		const services = await Service.findAll({
-			where: {
-				centre: req.params.id,
-				service_type: {
-					[Sequelize.Op.in]: [1, 2]  //Exclude BE services from Rolling Info 
-				}
-			}
-		});
-		let timeout;
-		// for each service configured for a center, get the list of eviction
-		for (const service of services) {
-			const source = axios.CancelToken.source();
-			let requestTimeout = (conf.getConfig().requestTimeout) ? conf.getConfig().requestTimeout : 30000;
-			timeout = setTimeout(() => {
-				source.cancel();
-				wlogger.error("No response received from Service " + service.service_url); 
-				wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
-			}, requestTimeout);
-			const eviction = await axios({
-				method: 'get',
-				url: (new URL(service.service_url + evictionUrl)).href,
-				auth: {
-					username: service.username,
-					password: Utilcrypto.decrypt(service.password)
-				},
-				validateStatus: false,
-				cancelToken: source.token
-			  }).catch(err => {
-				if (err.response) {
-				  // client received an error response (5xx, 4xx)
-				  wlogger.error("Received error response from Service " + service.service_url); 
-				  wlogger.error(err);
-				} else if (err.request) {
-				  // client never received a response, or request never left
-				  wlogger.error("No response received from Service " + service.service_url); 
-				  wlogger.error(err);
-				} else {
-				  // anything else
-				  wlogger.error("Error from Service " + service.service_url); 
-				  wlogger.error(err);
-				}
-			});
-			// Clear The Timeout
-			clearTimeout(timeout);
-			if(eviction && eviction.status == 200 && eviction.data){
+    // Get Rolling policy referred to the local centre:
+    const evictionsResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const evictionList = await ingestersController.getAllEvictions(req, evictionsResponse, next);
+    const evictionStatus = evictionList.status;
+    let evictionObjArray = [];
+    if (evictionStatus === 'RUNNING') {
+      let evictionPolicies = evictionList.evictionPolicies;
+      wlogger.debug("ROLLING: Eviction Policies: " + JSON.stringify(evictionPolicies, null, 2));
+      const consumersResponse = {
+        status: () => ({
+          json: (payload) => payload
+        })
+      };
+      const consumersList = await ingestersController.getAllConsumers(req, consumersResponse, next);
+      const producersResponse = {
+        status: () => ({
+          json: (payload) => payload
+        })
+      };
+      const producersList = await ingestersController.getAllProducers(req, producersResponse, next);
+      for(const evictionPolicyEl of evictionPolicies) {
+        const evictionConsumers = consumersList.filter(consumerEl => consumerEl.taskList.find(task => task.targetStores === evictionPolicyEl.storeGroupName));
+        const evictionTopics = evictionConsumers.map(consumer => consumer.topics);
+        let evictionProducers = [];
+        for (const topics of evictionTopics) {
+          const producers = producersList.filter(producer => topics.includes(producer.topic));
+          evictionProducers = evictionProducers.concat(producers);
+        }
+        let producerFilters = [];
+        for (const producer of evictionProducers) {
+          producerFilters.push(producer.source.filter);
+        }
+        evictionObjArray.push({evictionPolicy: evictionPolicyEl, filters: producerFilters});
+      }
+    }
 
-				wlogger.debug(eviction.data); 
-				for (const element of eviction.data.value) {
-					if (element.Cron.Active === true) {
-						rollingInfo.push(utility.parseRollingInfo(element))
-					}
-				
-				} 
-				wlogger.info("rollingInfo before removing duplicates");
-				wlogger.info(rollingInfo);
-				cleanRollingInfo = rollingInfo.filter((arr, index, self) =>
-    				index === self.findIndex((t) => (t.text === arr.text)))
-				wlogger.info("rollingInfo after removing duplicates");
-				wlogger.info(cleanRollingInfo);
-				
-			}
-		}
-		
-		// parse response
-		wlogger.debug({ "OK getRolling Centre: ": cleanRollingInfo });
-		return res.status(200).json(cleanRollingInfo);
+    
+		return res.status(200).json(evictionObjArray);
 	} catch (error) {
 		wlogger.error({ "ERROR getRolling: ": error });
 		wlogger.error(error);
@@ -239,280 +238,330 @@ getFakeDataSourcesInfo = () => {
 };
 
 /** [GET] /centres/1/datasourcesinfo
- * 	GET Data sources info. Please consider that this information comes from single instances or BE-Only instances
+ * 	GET Data sources info.
  *
  * 	@param {string} req.params.id id of the centre to get
  *
  * 	@returns {JSON} JSON Array with the list of data sources info
  */
- exports.getDataSourcesInfo = async (req, res) => {
+exports.getDataSourcesInfo = async (req, res, next) => {
 	wlogger.debug("getDataSourcesInfo: [GET] /centres/:id/datasourcesinfo");
-	try {
-		let dsInfo = [];
-		let cleanDsInfo = [];
-		const services = await Service.findAll({
+  try {
+    let dsInfo = [];
+
+    // Get all services of CDSE or GSS type:
+    const services = await Service.findAll({
 			where: {
-				centre: req.params.id,
 				service_type: {
-					[Sequelize.Op.in]: [1, 3]  //Exclude FE services from DS Info 
+					[Sequelize.Op.in]: [4, 8]
 				}
 			}
 		});
-		const feServices = await Service.findAll({
-			where: {
-				centre: {
-					[Sequelize.Op.ne]: req.params.id  //Exclude local service from DS Info matching synch results
-				},
-				service_type: {
-					[Sequelize.Op.in]: [1, 2]  //Exclude BE services from DS Info matching synch results
-				}
-			}
-		});
-		let serviceUrls = feServices.map(x => x.service_url);
-		wlogger.debug("serviceUrls are: ");
-		wlogger.debug(serviceUrls);
-		// for each service configured for a center, get the list of ds info
-		for (const service of services) {			
-			const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
-			wlogger.debug("Product Sources HTTP response");
-			// Get info from odata/v1 synchronizers
-			if (sources && sources.status == 404) {
-				wlogger.info("Get Data Sources Info: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
-				const synch = await utility.performDHuSServiceRequest(service, synchUrl);
-				if(synch && synch.status == 200 && synch.data){
+    // Get all producers referred to the local centre:
+    const producersResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const producers = await ingestersController.getAllProducers(req, producersResponse, next);
 
-					wlogger.debug(synch.data.d.results); 
-					const dataSourceStatus = (conf.getConfig().dataSourceStatus) ? conf.getConfig().dataSourceStatus : ["RUNNING", "PENDING"];
-					for (const element of synch.data.d.results) {
-						const synchServiceUrl = element.ServiceUrl.split('/odata')[0];
-						if (dataSourceStatus.indexOf(element.Status) >= 0 && 
-								(serviceUrls.indexOf(synchServiceUrl) >=0 || 
-								serviceUrls.indexOf(synchServiceUrl + '/') >=0)) {
-								let centreService = feServices.filter((arr) => arr.service_url.indexOf(synchServiceUrl)>=0);
-								let centre;
-								if (typeof centreService !== 'undefined' && centreService.length > 0) {
-									centre = await Centre.findOne({
-										where: {
-											id: centreService[0].centre
-										}
-									});
-								}
-								
-								dsInfo.push(utility.parseDataSourceInfo(element, centre))
-						}						
-					} 
-					wlogger.debug("getDataSourcesInfo before removing duplicates is");
-					wlogger.debug(dsInfo);
-					cleanDsInfo = dsInfo.filter((arr, index, self) => {
-						const _obj = JSON.stringify(arr);
-						return index === self.findIndex(obj => {
-						  return JSON.stringify(obj) === _obj;
-						})
-					})
-					wlogger.debug("getDataSourcesInfo after removing duplicates is");
-					wlogger.debug(cleanDsInfo);
-				}
-			} else if (sources && sources.status == 200 && sources.data) {
-				sourceList = sources.data.value;
-				wlogger.info("Service " + service.service_url + " is compliant with Intelligent Synchronizers. Getting synch list...")
-				const intelliSynch = await utility.performDHuSServiceRequest(service, intelliSynchUrl);
-				if(intelliSynch && intelliSynch.status == 200 && intelliSynch.data){
+    // Get all consumers referred to the local centre:
+    const consumersResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const consumers = await ingestersController.getAllConsumers(req, consumersResponse, next);
 
-					wlogger.debug(intelliSynch.data.value); 
-					// Check if Intelligent Synchronizer is Active from Cron.Active property
-					
-					for (const element of intelliSynch.data.value) {
-						if (element.Cron.Active) {
-							let referencedSources = element.ReferencedSources;
-							wlogger.debug("referencedSources");
-							wlogger.debug(referencedSources);
-							for (rs of referencedSources) {
-								let selectedSource = sourceList.filter((arr) =>rs.ReferenceId==arr.Id);
-								
-								if(selectedSource.length > 0 && typeof selectedSource[0] !== 'undefined') {
-									// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
-									try {
-										// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-										
-										if(referencedSources.length == 1 || (referencedSources.length > 1 && selectedSource[0].Listable)) {
-											
-											
-											const synchServiceUrl = selectedSource[0].Url.split('/odata')[0];
-
-											if (serviceUrls.indexOf(synchServiceUrl) >=0 || 
-												serviceUrls.indexOf(synchServiceUrl + '/') >=0) {
-												let centreService = feServices.filter((arr) => arr.service_url.indexOf(synchServiceUrl)>=0);
-												 
-												let centre;
-												if (typeof centreService !== 'undefined' && centreService.length > 0) {
-													centre = await Centre.findOne({
-														where: {
-															id: centreService[0].centre
-														}
-													});
-												}
-												
-												dsInfo.push(utility.parseV2DataSourceInfo(element, rs, selectedSource[0], centre))
-											}
-
-										} 
-									} catch (e) {
-										wlogger.error(e)
-									}
-								}			
-							}	
-						}
-					}
-					wlogger.debug("getDataSourcesInfo before removing duplicates is");
-					wlogger.debug(dsInfo);
-					cleanDsInfo = dsInfo.filter((arr, index, self) => {
-						const _obj = JSON.stringify(arr);
-						return index === self.findIndex(obj => {
-						  return JSON.stringify(obj) === _obj;
-						})
-					})
-					wlogger.debug("getDataSourcesInfo after removing duplicates is");
-					wlogger.debug(cleanDsInfo);
-				}
-
-			} else {
-				wlogger.info("Failed to retrieve sources and synch list for service " + service.service_url)
-			}
-		}
-		
-		// parse response
-		wlogger.debug({ "OK getDataSourcesInfo Centre: ": cleanDsInfo });
-		return res.status(200).json(cleanDsInfo);
+    // Object to store all producers and consumers of the local GSS:
+    const localIngestersDataSources = {producers: [], consumers: []};
+    producers.forEach((producerItem) => {
+      if (producerItem.name && producerItem.source && producerItem.topic && producerItem.source.serviceRootUrl && producerItem.source.lastPublicationDate && producerItem.source.filter) {
+        localIngestersDataSources.producers.push({ingesterName: producerItem.name, topic: producerItem.topic, serviceRootUrl: producerItem.source.serviceRootUrl, lastPublicationDate: producerItem.source.lastPublicationDate, filter: producerItem.source.filter });
+      }
+    });
+    consumers.forEach((consumerItem) => {
+      if (consumerItem.name && consumerItem.source && consumerItem.topics && consumerItem.source.serviceRootUrl) {
+        localIngestersDataSources.consumers.push({ingesterName: consumerItem.name, topics: consumerItem.topics, serviceRootUrl: consumerItem.source.serviceRootUrl });
+      }
+    });
+    
+    // Get All Ingesters instances to check which is Running:
+    const ingestersResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const allLocalIngesters = await ingestersController.getAllIngesters(req, ingestersResponse, next);
+    if (allLocalIngesters && allLocalIngesters.length > 0) {
+      const localIngestersRunningInstances = allLocalIngesters.filter((instance) => instance.state === 'RUNNING');
+      for (const localDsProducerItem of localIngestersDataSources.producers) {
+        const localProducerRunningInstance = localIngestersRunningInstances.some((instance) => instance.name === localDsProducerItem.ingesterName);
+        if (localProducerRunningInstance) {
+          const producerTopic = localDsProducerItem.topic;
+          for (const localDsConsumerItem of (localIngestersDataSources.consumers.filter(consumerSourceObj => consumerSourceObj.serviceRootUrl === localDsProducerItem.serviceRootUrl) || [])) {
+            if (localDsConsumerItem.topics.includes(producerTopic)) {
+              const localConsumerRunningInstance = localIngestersRunningInstances.some((instance) => instance.name === localDsConsumerItem.ingesterName);
+              if (localConsumerRunningInstance) {
+                // Once a matching running producer and consumer have been found, record the dsInfo.
+                const dsProducerItemService = services.find((s) => {
+                  return localDsProducerItem.serviceRootUrl.includes(s.service_url);
+                });
+                if (!dsProducerItemService) {
+                  wlogger.warn("No service found for producer: " + JSON.stringify(localDsProducerItem, null, 2));
+                  return res.status(404).json({ message: 'No service found for producer: ' + localDsProducerItem.ingesterName });
+                }
+                const dsProducerItemCentre = await Centre.findOne({
+                  where: {
+                    id: dsProducerItemService.centre
+                  }
+                });
+                dsInfo.push({
+                  info: localDsProducerItem.ingesterName,
+                  filter: localDsProducerItem.filter,
+                  lastCreationDate: localDsProducerItem.lastPublicationDate,
+                  centre: dsProducerItemCentre
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    //wlogger.debug("getDataSourcesInfo: " + JSON.stringify(dsInfo, null, 2));
+		return res.status(200).json(dsInfo);
 	} catch (error) {
 		wlogger.error({ "ERROR getDataSourcesInfo: ": error });
 		wlogger.error(error);
 		return res.status(500).json(error);
 	}
-};
+}
+
+
+/** [GET] /centres/1/dhsconnected
+ * 	GET DHS Connected.
+ *
+ * 	@param {string} req.params.id id of the centre to get
+ *
+ * 	@returns {JSON} JSON Array with the list of dhs connected
+ */
+exports.getDhsConnected = async (req, res, next) => {
+	wlogger.debug("getDhsConnected: [GET] /centres/:id/dhsconnected");
+  wlogger.debug("req.params: " + JSON.stringify(req.params, null, 2));
+
+  let dhsConnected = [];
+  try {
+    const centre = await Centre.findOne({
+      where: {
+        local: true
+      }
+    });
+    if (!centre) {
+      return res.status(404).json({ message: 'There is no local centre set' });
+    }
+    const localServiceList = await Service.findAll({
+      where: {
+        centre: centre.id,
+        service_type: 8  //Get only GSS services
+      }
+    });
+    if (localServiceList && localServiceList.length > 0) {
+      localService = localServiceList[0];
+
+      // Get all producers referred to the external centres:
+      const allProducersExtResponse = {
+        status: () => ({
+          json: (payload) => payload
+        })
+      };
+      const allProducersExt = await ingestersController.getAllProducersExt(req, allProducersExtResponse, next);
+      const allProducersExtFiltered = allProducersExt
+        .map(item => ({
+          ...item,
+          producers: item.producers.filter(
+            producer => producer.source.serviceRootUrl === localService.service_url
+          )
+        }))
+        .filter(item => item.producers.length > 0);
+      const allProducersNames = allProducersExtFiltered.map(producerObj => producerObj.producers.map(producer => producer.name)).flat();
+
+      // Get all consumers referred to the external centres:
+      const allConsumersExtResponse = {
+        status: () => ({
+          json: (payload) => payload
+        })
+      };
+      const allConsumersExt = await ingestersController.getAllConsumersExt(req, allConsumersExtResponse, next);
+      const allConsumersExtFiltered = allConsumersExt
+        .map(item => ({
+          ...item,
+          consumers: item.consumers.filter(
+            consumer => consumer.source.serviceRootUrl === localService.service_url
+          )
+        }))
+        .filter(item => item.consumers.length > 0);
+      const allConsumersNames = allConsumersExtFiltered.map(consumerObj => consumerObj.consumers.map(consumer => consumer.name)).flat();
+
+      // Get all ingesters referred to the external centres:
+      const allIngestersExtResponse = {
+        status: () => ({
+          json: (payload) => payload
+        })
+      };
+      const allIngestersExt = await ingestersController.getAllIngestersExt(req, allIngestersExtResponse, next);
+      const allIngestersExtFiltered = allIngestersExt
+        .map(item => ({
+          ...item,
+          instances: item.instances.filter(
+            ingester => allProducersNames.includes(ingester.name) || allConsumersNames.includes(ingester.name)
+          )
+        }))
+        .filter(item => item.instances.length > 0);
+
+
+      const allIngestersExtFilteredConsumers = allIngestersExtFiltered
+        .map(item => ({
+          ...item,
+          instances: item.instances.filter(ingester => allConsumersNames.includes(ingester.name))
+        }))
+        .filter(item => item.instances.length > 0);
+      const allIngestersExtFilteredProducers = allIngestersExtFiltered
+        .map(item => ({
+          ...item,
+          instances: item.instances.filter(ingester => allProducersNames.includes(ingester.name))
+        }))
+        .filter(item => item.instances.length > 0);
+
+
+      for (const producerSourceObj of allProducersExtFiltered) {
+        for (const producer of producerSourceObj.producers) {
+          const producerTopic = producer.topic;
+          for (const consumer of allConsumersExtFiltered.find(consumerSourceObj => consumerSourceObj.service.id === producerSourceObj.service.id)?.consumers || []) {
+            if (consumer.topics.includes(producerTopic)) {
+
+              let ingesterConsumerRunning = null;
+              for (const consumerInstance of allIngestersExtFilteredConsumers.map(item => item.instances).flat()) {
+                if (consumerInstance.name === consumer.name) {
+                  if (consumerInstance.hasOwnProperty('state') && consumerInstance.state === 'RUNNING') {
+                    ingesterConsumerRunning = consumerInstance;
+                  }
+                }
+              }
+              let ingesterProducerRunning = null;
+              for (const producerInstance of allIngestersExtFilteredProducers.map(item => item.instances).flat()) {
+                if (producerInstance.name === producer.name) {
+                  if (producerInstance.hasOwnProperty('state') && producerInstance.state === 'RUNNING') {
+                    ingesterProducerRunning = producerInstance;
+                  }
+                }
+              }
+
+              if (ingesterConsumerRunning && ingesterProducerRunning) {
+                // Both consumer and producer are running
+                dhsConnected.push({ service: producerSourceObj.service, centre: producerSourceObj.service.centre, consumer: ingesterConsumerRunning, producer: ingesterProducerRunning });
+              }
+            }
+          }
+        }
+      }
+    }
+    return res.status(200).json(dhsConnected);
+  } catch (error) {
+		wlogger.error({ "ERROR getDhsConnected: ": error });
+		wlogger.error(error);
+		return res.status(500).json(error);
+	}
+}
+
 
 
 /** [GET] /centres/1/map/datasourcesinfo
- * 	GET centres providing Data sources info. Please consider that this information comes from single instances or BE-Only instances
+ * 	GET centres providing Data sources info.
  *
  * 	@param {string} req.params.id id of the centre to get
  *
  * 	@returns {JSON} JSON Array with the list of centres providing data to "source" centre
  */
- exports.getMapDataSourcesInfo = async (req, res) => {
+ exports.getMapDataSourcesInfo = async (req, res, next) => {
 	wlogger.debug("getMapDataSourcesInfo: [GET] /centres/:id/map/datasourcesinfo");
 	try {
 		let dsInfo = [];
 		let centres = [];
 		const services = await Service.findAll({
 			where: {
-				centre: req.params.id,
 				service_type: {
-					[Sequelize.Op.in]: [1, 3]  //Exclude FE services from DS Info 
+					[Sequelize.Op.in]: [4, 8]  //Get only CDSE or GSS types
 				}
 			}
 		});
-		// for each service configured for a center, get the list of ds info
-		for (const service of services) {
-			
-			const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
-				wlogger.debug("Product Sources HTTP response");
-				// Get info from odata/v1 synchronizers
-				if (sources && sources.status == 404) {
-					wlogger.info("Get Map Data Sources Info: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
-					const synch = await utility.performDHuSServiceRequest(service, selectSynchUrl);
-					if(synch && synch.status == 200 && synch.data){
-
-						wlogger.debug(synch.data.d.results); 
-						const dataSourceStatus = (conf.getConfig().dataSourceStatus) ? conf.getConfig().dataSourceStatus : ["RUNNING", "PENDING"];
 		
-						for (const element of synch.data.d.results) {
-							if (dataSourceStatus.indexOf(element.Status) >= 0) {
-								// add both serviceUrl ending or not with slash, to facilitate the search on the DB from Synch results
-								const synchServiceUrl = element.ServiceUrl.split('/odata')[0];
-								dsInfo.push(synchServiceUrl);
-								dsInfo.push(synchServiceUrl + '/');
-							}
-						
-						}
-						wlogger.debug("dsInfo from legacy synch is:  ");
-						wlogger.debug(dsInfo);
-						
-					}
-				} else if (sources && sources.status == 200 && sources.data) {
+    // Get all producers referred to the local centre:
+    const producersResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const producers = await ingestersController.getAllProducers(req, producersResponse, next);
 
-					sourceList = sources.data.value;
-					wlogger.info("Service " + service.service_url + " is compliant with Intelligent Synchronizers. Getting synch list...")
-					const intelliSynch = await utility.performDHuSServiceRequest(service, intelliSynchUrl);
-					if(intelliSynch && intelliSynch.status == 200 && intelliSynch.data){
+    // Get all consumers referred to the local centre:
+    const consumersResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const consumers = await ingestersController.getAllConsumers(req, consumersResponse, next);
 
-						wlogger.debug(intelliSynch.data.value); 
-						// Check if Intelligent Synchronizer is Active from Cron.Active property
-						for (const element of intelliSynch.data.value) {
-							if (element.Cron.Active) {
-								let referencedSources = element.ReferencedSources;
-								wlogger.debug("referencedSources");
-								wlogger.debug(referencedSources);
-								for (rs of referencedSources) {
-									let selectedSource = sourceList.filter((arr) =>rs.ReferenceId==arr.Id);
-									if(selectedSource.length > 0 && typeof selectedSource[0] !== 'undefined') {
-										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
-										try {
-											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-											if(referencedSources.length == 1 || (referencedSources.length > 1 && selectedSource[0].Listable)) {
-												const synchServiceUrl = selectedSource[0].Url.split('/odata')[0];
-												dsInfo.push(synchServiceUrl);
-												dsInfo.push(synchServiceUrl + '/');
+    const ingestersDataSources = {producers: [], consumers: []};
+    producers.forEach((producerItem) => {
+      if (producerItem.name && producerItem.source && producerItem.topic && producerItem.source.serviceRootUrl && producerItem.source.lastPublicationDate && producerItem.source.filter) {
+        ingestersDataSources.producers.push({ingesterName: producerItem.name, topic: producerItem.topic, serviceRootUrl: producerItem.source.serviceRootUrl, lastPublicationDate: producerItem.source.lastPublicationDate, filter: producerItem.source.filter });
+      }
+    });
+    consumers.forEach((consumerItem) => {
+      if (consumerItem.name && consumerItem.source && consumerItem.topics && consumerItem.source.serviceRootUrl) {
+        ingestersDataSources.consumers.push({ingesterName: consumerItem.name, topics: consumerItem.topics, serviceRootUrl: consumerItem.source.serviceRootUrl });
+      }
+    });
 
-											} 
-										} catch (e) {
-											wlogger.error(e)
-										}
-									}			
-								}	
-							}
-						}
-						wlogger.debug("dsInfo from intelligent synch is:  ");
-						wlogger.debug(dsInfo);
-					}
-				} else {
-					wlogger.info("Failed to retrieve sources and synch list for service " + service.service_url)
-				}
-			wlogger.debug("final dsInfo is:  ");
-			wlogger.debug(dsInfo);
-				
-			
-		}
-		const service_centres = await Service.findAll({
-			attributes:['centre'],
-			where: {
-				service_url: {
-					[Sequelize.Op.in]: dsInfo  //Get the list of services metching the OData Synchronizers ServiceUrl
-				},
-				service_type: {
-					[Sequelize.Op.in]: [1, 2]  //Exclude BE services from DS Info 
-				}
-			}
-		});
-		let centreIds = service_centres.map(centre => centre.centre);
-		wlogger.debug("service_centres is:  ");
-		wlogger.debug(centreIds);
-		centres = await Centre.findAll({
-			where: {
-				[Sequelize.Op.or]: [
-					{
-					id: {
-						[Sequelize.Op.in]: centreIds  //Get the list of Centres metching the Services retrieved by the OData Synch list
-					}
-				},{
-				local: true
-				}]
-			}
-		});
-		wlogger.debug("centres is:  ");
-		wlogger.debug(centres);
+    // Get All Ingesters instances to check which is Running:
+    const ingestersResponse = {
+      status: () => ({
+        json: (payload) => payload
+      })
+    };
+    const allIngesters = await ingestersController.getAllIngesters(req, ingestersResponse, next);
+    if (allIngesters && allIngesters.length > 0) {
+      const ingestersRunningInstances = allIngesters.filter((instance) => instance.state === 'RUNNING');
+      for (const dsProducerItem of ingestersDataSources.producers) {
+        if (ingestersRunningInstances.some((instance) => instance.name === dsProducerItem.ingesterName)) {
+          const dsProducerItemService = services.find((s) => {
+            return dsProducerItem.serviceRootUrl.includes(s.service_url);
+          });
+          const dsProducerItemCentre = await Centre.findOne({
+            where: {
+              id: dsProducerItemService.centre
+            }
+          });
+          dsInfo.push({
+            info: dsProducerItem.ingesterName,
+            filter: dsProducerItem.filter,
+            lastCreationDate: dsProducerItem.lastPublicationDate,
+            centre: dsProducerItemCentre
+          });
+        }
+      }
+    }
+
+    const localCentre = await Centre.findOne({
+        where: {
+          local: true
+        }
+      });
+    centres = dsInfo.map((ds) => ds.centre);
+    if (centres.length > 0) {
+      centres.push(localCentre);
+    }
 		
-		// parse response
-		wlogger.debug({ "OK getMapDataSourcesInfo Centre: ": centres });
 		return res.status(200).json(centres);
 	} catch (error) {
 		wlogger.error({ "ERROR getMapDataSourcesInfo: ": error });
@@ -522,174 +571,10 @@ getFakeDataSourcesInfo = () => {
 };
 
 
-/** [GET] /centres/1/map/dhsconnected
- * 	GET centres getting data from the "source" centre. 
- *
- * 	@param {string} req.params.id id of the source centre
- *
- * 	@returns {JSON} JSON Array with the list of centres getting data from the "source" centre. 
- */
- exports.getMapDhsConnected = async (req, res) => {
-	wlogger.debug("getMapDhsConnected: [GET] /centres/:id/map/dhsconnected");
-	try {
-		let dsInfo = [];
-		let centres = [];
-		let centreServices = [];
-		const services = await Service.findAll();
-		wlogger.debug("services are");
-		wlogger.debug(services);
-		let timeout;
-		// for each service configured for a center, get the list of ds info
-		for (const service of services) {
-			wlogger.debug("service.centre: " + service.centre);
-			wlogger.debug("req.params.id: " + req.params.id);
-			// get the list of service_url intersecting the configured services of a center (excluding the source centre)
-			if(service.centre != req.params.id && service.service_type != 2 && service.service_type < 4 ) { //Exclude FE services, DAS Services and local services from the list 
-				// Check if DHuS service support Intelligent Synchronizers by performing request to ProductSources entity
-				const sources = await utility.performDHuSServiceRequest(service, productSourcesUrl);
-				wlogger.debug("Product Sources HTTP response");
-				// Get info from odata/v1 synchronizers
-				if (sources && sources.status == 404) {
-					wlogger.info("Get DHS Connected: Service " + service.service_url + " does not support Intelligent Synchronizers. Getting legacy synch list...")
-					const synch = await utility.performDHuSServiceRequest(service, selectSynchUrl);
-					if(synch && synch.status == 200 && synch.data){
-
-						wlogger.debug(synch.data.d.results); 
-						const dataSourceStatus = (conf.getConfig().dataSourceStatus) ? conf.getConfig().dataSourceStatus : ["RUNNING", "PENDING"];
-		
-						for (const element of synch.data.d.results) {
-							if (dataSourceStatus.indexOf(element.Status) >= 0) {
-								// add both serviceUrl ending or not with slash, to facilitate the search on the DB from Synch results
-								dsInfo.push({"centre": service.centre,"synch": element.ServiceUrl.split('/odata')[0]});
-							}
-						
-						}
-						
-					}
-				} else if (sources && sources.status == 200 && sources.data) {
-					sourceList = sources.data.value;
-					wlogger.info("Service " + service.service_url + " is compliant with Intelligent Synchronizers. Getting synch list...")
-					const intelliSynch = await utility.performDHuSServiceRequest(service, intelliSynchUrl);
-					if(intelliSynch && intelliSynch.status == 200 && intelliSynch.data){
-
-						//wlogger.debug("DEV - intelliSynch.data.value: "+intelliSynch.data.value); 
-						// Check if Intelligent Synchronizer is Active from Cron.Active property
-						for (const element of intelliSynch.data.value) {
-							if (element.Cron.Active) {
-								let referencedSources = element.ReferencedSources;
-								wlogger.debug("referencedSources");
-								wlogger.debug(referencedSources);
-								for (rs of referencedSources) {
-									let selectedSource = sourceList.filter((arr) =>rs.ReferenceId==arr.Id);
-									if(selectedSource.length > 0 && typeof selectedSource[0] !== 'undefined') {
-										// add all url of sources whose index is equal to ReferenceId (can contain repeated urls)
-										try {
-											// if a synch contains only one ReferncedSource, the Listable attribute is ignored, so add it to dsInfo 
-											if(referencedSources.length == 1 || (referencedSources.length > 1 && selectedSource[0].Listable)) {
-												dsInfo.push({"centre": service.centre,"synch": selectedSource[0].Url.split('/odata')[0]});
-
-											} 
-										} catch (e) {
-											wlogger.error(e)
-										}
-									}
-										
-								}	
-							}
-						
-						}
-					}
-				} else {
-					wlogger.info("Failed to retrieve sources and synch list for service " + service.service_url)
-				}
-			// TODO: Check if also service_types > 3 are needed here for DHS Connected
-			} else if (service.centre == req.params.id && service.service_type != 3 && service.service_type < 4) {  // get local services (excluding BE services and DAS services)
-				if (service.service_url.lastIndexOf('/') == service.service_url.length -1) {
-					centreServices.push(service.service_url.slice(0, -1));
-				} else {
-					centreServices.push(service.service_url);
-				}
-			}
-		}
-		wlogger.debug("dsInfo is:  ");
-		wlogger.debug(dsInfo);
-		wlogger.debug("centreServices is:  ");
-		wlogger.debug(centreServices);
-		let filteredCentres = dsInfo.filter(function (ds) {
-			return centreServices.indexOf(ds.synch) >= 0;
-		  });
-		wlogger.debug("filteredCentres is:  ");
-		wlogger.debug(filteredCentres);
-		let centreIds = filteredCentres.map(function(d) { return d["centre"]; });
-		wlogger.debug("centresId is:  ");
-		wlogger.debug(centreIds);
-		centres = await Centre.findAll({
-			where: {
-				[Sequelize.Op.or]: [
-					{
-					id: {
-						[Sequelize.Op.in]: centreIds  //Get the list of Centres metching the Services retrieved by the OData Synch list
-					}
-				},{
-				local: true
-				}]
-			}
-		});
-		wlogger.debug("centres is:  ");
-		wlogger.debug(centres);
-		// parse response
-		wlogger.debug({ "OK getMapDhsConnected Centre: ": centres });
-		return res.status(200).json(centres);
-	} catch (error) {
-		wlogger.error({ "ERROR getMapDhsConnected: ": error });
-		wlogger.error(error);
-		return res.status(500).json(error);
-	}
-};
-
-//Compute service availability related to provided date filters for the provided FE or Single Instance centre
+//Compute service availability related to provided date filters for the local centre
 // For all authenticated users
-/* Request body example:
- * {
- 	"startDate":"2021-11-05T00:00:00",
-	"stopDate":"2021-11-06T23:59:59"
- * }
-   Response example
-   {
-	"centreId": "1",
-	"values": [{
-			"date": "2022-02-27",
-			"successResponses": 128,
-			"totalRequests": 144,
-			"percentage": 88.88888888888889,
-			"average": 97,222222
-		},
-		{
-			"date": "2022-02-27",
-			"successResponses": 144,
-			"totalRequests": 144,
-			"percentage": 100,
-			"average": 97,222222
-		},
-		{
-			"date": "2022-03-01",
-			"successResponses": 138,
-			"totalRequests": 138,
-			"percentage": 100,
-			"average": 97,222222
-		},
-		{
-			"date": "2022-03-02",
-			"successResponses": 1,
-			"totalRequests": 1,
-			"percentage": 100,
-			"average": 97,222222
-		}]
-	}
-*/
 exports.computeAvailability = async (req, res, next) => {
 	let availability = {};
-	//let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY day) x ORDER BY day";
 	let query = "SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT SUM(COUNT::float) / SUM(TOTAL::float)*100 FROM (SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day) z ) average FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY day ) x ORDER BY day";
 	wlogger.info("computeAvailability: [GET] /centres/:id/service/availability");
 	try {
@@ -697,8 +582,8 @@ exports.computeAvailability = async (req, res, next) => {
 			return res.status(400).json("Centre must be a number");
 		}
 		availability.centreId = req.params.id;
-		wlogger.debug("request body");
-		wlogger.debug(req.body);
+		//wlogger.debug("request body");
+		//wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
@@ -729,44 +614,10 @@ exports.computeAvailability = async (req, res, next) => {
 	}
 };
 
-//Compute weekly service availability related to provided date filters for the provided FE or Single Instance centre
+//Compute weekly service availability related to provided date filters for the local centre
 // For all authenticated users
-/* Request body example:
- * {
- 	"startDate":"2022-05-01T00:00:00",
-	"stopDate":"2022-05-21T23:59:59"
- * }
-   Response example
-{
-    "centreId": "24",
-    "values": [
-        {
-            "date": "2022-05-02",
-            "successResponses": "60",
-            "totalRequests": "161",
-            "percentage": 37.267080745341616,
-            "average": 72.18532321141016
-        },
-        {
-            "date": "2022-05-09",
-            "successResponses": "113",
-            "totalRequests": "125",
-            "percentage": 90.4,
-            "average": 72.18532321141016
-        },
-        {
-            "date": "2022-05-16",
-            "successResponses": "64",
-            "totalRequests": "72",
-            "percentage": 88.88888888888889,
-            "average": 72.18532321141016
-        }
-    ]
-}
-*/
 exports.computeAvailabilityWeekly = async (req, res, next) => {
 	let availability = {};
-	//let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\", (count/total::float)*100 as percentage FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id = ? GROUP BY week) x ORDER BY week";
 	let query = "SELECT to_char(date_trunc('week', week),'YYYY-MM-DD') as date, count as \"successResponses\", total as \"totalRequests\",(count/total::float)*100 percentage, (SELECT SUM(COUNT::float) / SUM(TOTAL::float)*100 FROM (SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week) z ) average FROM ( SELECT date_trunc('week', timestamp) \"week\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? and centre_id=? GROUP BY week ) x ORDER BY week";
 	wlogger.info("computeAvailabilityWeekly: [GET] /centres/:id/service/availability/weekly");
 	try {
@@ -774,8 +625,8 @@ exports.computeAvailabilityWeekly = async (req, res, next) => {
 			return res.status(400).json("Centre must be a number");
 		}
 		availability.centreId = req.params.id;
-		wlogger.debug("request body");
-		wlogger.debug(req.body);
+		//wlogger.debug("request body");
+		//wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
@@ -807,21 +658,8 @@ exports.computeAvailabilityWeekly = async (req, res, next) => {
 };
 
 
-//Compute service availability related to provided date filters for the provided FE or Single Instance centre
+//Compute service availability related to provided date filters for the local centre
 // For all authenticated users
-/* Request body example:
- * {
- 	"startDate":"2021-11-05T00:00:00",
-	"stopDate":"2021-11-06T23:59:59"
- * }
-   Response example
-   {
-    "centreId": "2",
-    "average": 47.61904761904761,
-    "startDate": "2022-02-23",
-    "stopDate": "2022-03-04"
-   }
-*/
 exports.computeAverageAvailability = async (req, res, next) => {
 	let availability = {};
 	let query = "SELECT AVG(percentage) as average FROM(SELECT to_char(date_trunc('day', day),'YYYY-MM-DD') as day, count, total, (count/total::float)*100 percentage FROM ( SELECT date_trunc('day', timestamp) \"day\", count(*) total, sum(case when http_status_code between 200 and 499 then 1 else 0 end) count FROM service_availability WHERE timestamp >= ? and timestamp <= ? AND centre_id=? GROUP BY day) x ORDER BY day) y";
@@ -831,8 +669,8 @@ exports.computeAverageAvailability = async (req, res, next) => {
 			return res.status(400).json("Centre must be a number");
 		}
 		availability.centreId = req.params.id;
-		wlogger.debug("request body");
-		wlogger.debug(req.body);
+		//wlogger.debug("request body");
+		//wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
@@ -865,42 +703,19 @@ exports.computeAverageAvailability = async (req, res, next) => {
 	}
 };
 
-//Compute service timeliness related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
+//Compute service timeliness related to provided date filters for the provided centre
 // For all authenticated users
-/* Request body example:
- * {
- 	"startDate":"2021-11-05",
-	"stopDate":"2021-11-06",
-	"synchId": 0,
-	"synchLabel": "S2B"
-	"backendUrl": "https://apihub.copernicus.eu/apihub"
- * }
-   Response example
-   {
-	"centreId": "1",
-	"values": [{
-		"day": "2022-04-02",
-		"centre_id": 1,
-		"synch_id": 1,
-		"synch_label": "S2B",
-		"average_fe": null,
-		"average_be": 878656940.00000000,
-		"number_of_measurements": 24
-		}]
-	}
-*/
 exports.computeTimeliness = async (req, res, next) => {
 	let publication_timeliness = {};
-	//let query = "select to_char(date_trunc('day', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe) as average_fe, avg(timeliness_be) as average_be, avg(case when timeliness_fe is not null then timeliness_fe else timeliness_be end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe::float) as average_fe, avg(timeliness_be::float) as average_be, avg(case when timeliness_fe is not null then timeliness_fe::float else timeliness_be::float end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	wlogger.info("computeTimeliness: [GET] /centres/:id/service/timeliness/daily");
+	let query = "select to_char(date_trunc('day', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, filter_label, avg(timeliness::float) as average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and filter_label=? and source_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, filter_label";
+  wlogger.info("computeTimeliness: [GET] /centres/:id/service/timeliness/daily");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
 		}
 		publication_timeliness.centreId = req.params.id;
-		wlogger.debug("request body");
-		wlogger.debug(req.body);
+		//wlogger.debug("request body");
+		//wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
@@ -911,19 +726,18 @@ exports.computeTimeliness = async (req, res, next) => {
 			return res.status(400).json("startDate must be greater or equal than stopDate");
 		}
 		
-		wlogger.info(`Compute publication timeliness between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
-		 of the BE ${req.body.backendUrl}` );
+		wlogger.info(`Compute publication timeliness between  ${req.body.startDate} and ${req.body.stopDate} for the filter ${req.body.filterLabel} on source ${req.body.localUrl}` );
 		
 		// Add query to retrieve availability results
 		const itemList = await sequelize.query(
 			query,
 			{
-				replacements: [req.params.id, req.body.synchId, req.body.synchLabel, req.body.backendUrl, req.body.startDate, req.body.stopDate],
+				replacements: [req.params.id, req.body.filterLabel, req.body.localUrl, req.body.startDate, req.body.stopDate],
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
 		publication_timeliness.values = itemList;
-		wlogger.debug("Daily Publication Layency:");
+		wlogger.debug("Daily Publication Timeliness:");
 		wlogger.debug(publication_timeliness)
 		return res.status(200).json(publication_timeliness);
 	} catch (error) {
@@ -932,45 +746,19 @@ exports.computeTimeliness = async (req, res, next) => {
 	}
 };
 
-//Compute weekly service timeliness related to provided date filters for the provided centre, BE Service and sync (identified by id/label)
+//Compute weekly service timeliness related to provided date filters for the provided centre
 // For all authenticated users
-/* Request body example:
-{
- 	"startDate":"2022-05-01",
-	"stopDate":"2022-05-21",
-	"synchId": 0,
-	"synchLabel": "S2B"
-	"backendUrl": "https://apihub.copernicus.eu/apihub"
-}
-   Response example
-{
-    "centreId": "24",
-    "values": [
-        {
-            "week": "2022-05-02",
-            "centre_id": 24,
-            "synch_id": 3,
-            "synch_label": "S2 L2A",
-            "average_fe": 1346705456.7605634,
-            "average_be": 1346705456.7605634,
-            "average_timeliness": 1346705456.7605634,
-            "number_of_measurements": "213"
-        }
-    ]
-}
-*/
 exports.computeTimelinessWeekly = async (req, res, next) => {
 	let publication_timeliness = {};
-	//let query = "select to_char(date_trunc('week', "timestamp"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe) as average_fe, avg(timeliness_be) as average_be, avg(case when timeliness_fe is not null then timeliness_fe else timeliness_be end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by week, centre_id, synch_id, synch_label";
-	let query = "select to_char(date_trunc('week', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, synch_id, synch_label, avg(timeliness_fe::float) as average_fe, avg(timeliness_be::float) as average_be, avg(case when timeliness_fe is not null then timeliness_fe::float else timeliness_be::float end) average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, synch_id, synch_label";
-	wlogger.info("computeTimelinessWeekly: [GET] /centres/:id/service/timeliness/weekly");
+	let query = "select to_char(date_trunc('week', \"timestamp\"),'YYYY-MM-DD') as day, centre_id, filter_label, avg(timeliness::float) as average_timeliness, count(*) as number_of_measurements from publication_timeliness WHERE centre_id=? and filter_label=? and source_url = ? and(timestamp >= ? and timestamp <= ? ) group by day, centre_id, filter_label";
+  wlogger.info("computeTimelinessWeekly: [GET] /centres/:id/service/timeliness/weekly");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
 		}
 		publication_timeliness.centreId = req.params.id;
-		wlogger.debug("request body");
-		wlogger.debug(req.body);
+		//wlogger.debug("request body");
+		//wlogger.debug(req.body);
 		if (!req.body.startDate || !req.body.stopDate) {
 			return res.status(400).json("Not valid Date range");
 		}		
@@ -981,19 +769,18 @@ exports.computeTimelinessWeekly = async (req, res, next) => {
 			return res.status(400).json("startDate must be greater or equal than stopDate");
 		}
 		
-		wlogger.info(`Compute weekly publication timeliness between  ${req.body.startDate} and ${req.body.stopDate} for the sync ${req.body.synchId} - ${req.body.synchLabel}
-		 of the BE ${req.body.backendUrl}` );
+		wlogger.info(`Compute publication timeliness between  ${req.body.startDate} and ${req.body.stopDate} for the filter ${req.body.filterLabel} on source ${req.body.localUrl}` );
 		
 		// Add query to retrieve availability results
 		const itemList = await sequelize.query(
 			query,
 			{
-				replacements: [req.params.id, req.body.synchId, req.body.synchLabel, req.body.backendUrl, req.body.startDate, req.body.stopDate],
+				replacements: [req.params.id, req.body.filterLabel, req.body.localUrl, req.body.startDate, req.body.stopDate],
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
 		publication_timeliness.values = itemList;
-		wlogger.debug("Weekly Publication Layency:");
+		wlogger.debug("Weekly Publication Timeliness:");
 		wlogger.debug(publication_timeliness)
 		return res.status(200).json(publication_timeliness);
 	} catch (error) {
@@ -1002,54 +789,19 @@ exports.computeTimelinessWeekly = async (req, res, next) => {
 	}
 };
 
-//Compute service timeliness daily details related to provided date for the provided centre, BE Service and sync (identified by id/label)
+//Compute service timeliness daily details related to provided date for the provided centre
 // For all authenticated users
-/* Request body example:
- * {
- 	"date":"2021-11-05",
-	"synchId": 0,
-	"synchLabel": "S2B"
-	"backendUrl": "https://apihub.copernicus.eu/apihub"
- * }
-   Response example
-   {
-	"centreId": "1",
-	"values": [{
-		"timezone": "2022-04-11 13:09:30",
-		"centre_id": 1,
-		"synch_id": 1,
-		"synch_label": "S2B",
-		"average_fe": null,
-		"average_be": 856016551
-		},{
-		"timezone": "2022-04-11 13:23:57",
-		"centre_id": 1,
-		"synch_id": 1,
-		"synch_label": "S2B",
-		"average_fe": null,
-		"average_be": 857024401
-		},{
-		"timezone": "2022-04-11 13:44:50",
-		"centre_id": 1,
-		"synch_id": 1,
-		"synch_label": "S2B",
-		"average_fe": null,
-		"average_be": 857922853
-		}]
-	}
-*/
 exports.computeTimelinessDetails = async (req, res, next) => {
 	let publication_timeliness = {};
-	//let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, timeliness_fe, timeliness_be from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', "timestamp") = ? group by timestamp, centre_id, synch_id, synch_label, timeliness_fe, timeliness_be";
-	let query = "select timestamp at time zone 'UTC', centre_id, synch_id, synch_label, timeliness_fe::float, timeliness_be::float from publication_timeliness WHERE centre_id=? and synch_id=? and synch_label=? and backend_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, synch_id, synch_label, timeliness_fe, timeliness_be";
-	wlogger.info("computeTimelinessDetails: [GET] /centres/:id/service/timeliness/daily/details");
+	let query = "select timestamp at time zone 'UTC', centre_id, filter_label, timeliness::float from publication_timeliness WHERE centre_id=? and filter_label=? and source_url = ? and date_trunc('day', \"timestamp\") = ? group by timestamp, centre_id, filter_label, timeliness";
+  wlogger.info("computeTimelinessDetails: [GET] /centres/:id/service/timeliness/daily/details");
 	try {
 		if (isNaN(req.params.id)) {
 			return res.status(400).json("Centre must be a number");
 		}
 		publication_timeliness.centreId = req.params.id;
-		wlogger.debug("request body");
-		wlogger.debug(req.body);
+		//wlogger.debug("request body");
+		//wlogger.debug(req.body);
 		if (!req.body.date) {
 			return res.status(400).json("Not valid Date");
 		}		
@@ -1057,20 +809,19 @@ exports.computeTimelinessDetails = async (req, res, next) => {
 			return res.status(400).json("Invalid Date Format")
 		}
 		
-		wlogger.info(`Compute publication timeliness details in the date ${req.body.date} for the sync ${req.body.synchId} - ${req.body.synchLabel}
-		 of the BE ${req.body.backendUrl}` );
+		wlogger.info(`Compute publication timeliness details in the date ${req.body.date} for the filter ${req.body.filterLabel} on source ${req.body.localUrl}` );
 		
 		// Add query to retrieve availability results
 		const itemList = await sequelize.query(
 			query,
 			{
-				replacements: [req.params.id, req.body.synchId, req.body.synchLabel, req.body.backendUrl, req.body.date],
+				replacements: [req.params.id, req.body.filterLabel, req.body.localUrl, req.body.date],
 				type: Sequelize.QueryTypes.SELECT
 			}
 		);
 		publication_timeliness.values = itemList;
-		wlogger.debug("Daily Publication Layency Details:");
-		wlogger.debug(publication_timeliness)
+		//wlogger.debug("Daily Publication Timeliness Details:");
+		//wlogger.debug(publication_timeliness)
 		return res.status(200).json(publication_timeliness);
 	} catch (error) {
 		wlogger.error(error);

@@ -1,14 +1,14 @@
-FROM node:slim
+FROM node:alpine3.24
 
+RUN npm install -g npm@latest
+
+RUN apk update && apk upgrade --no-cache
 WORKDIR /usr/src/app/
 
 # copy package.json, and package-lock.json if exists
-COPY package.json package-lock.json* ./
+COPY package*.json ./
 
-RUN npm install
+RUN npm ci
 RUN npm cache clean --force
 
-# Temp directory to store uploading attachment, deleted after sending email , and anyway when the container is destroyed
-RUN mkdir uploads
-
-COPY . . 
+COPY . .

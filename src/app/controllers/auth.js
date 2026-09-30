@@ -17,7 +17,6 @@ let userDataArray = [];
  */
 exports.refreshUserToken = async (sub) => {
   try {
-    wlogger.info(`User ${sub} token refresh attempt..`);
     let userDataIndex;
     userDataArray.forEach((userData, index) => {
       if (userData && userData.hasOwnProperty('sub') && userData.sub == sub) {
@@ -79,12 +78,10 @@ exports.refreshUserToken = async (sub) => {
       decodedToken = jwt.decode(result.data.access_token); //decodes and verifies the token extracted form the header
       if (decodedToken.resource_access[conf.auth.clientId].roles.indexOf(adminRole) >= 0) {
         auth.isAdmin = true;
-        wlogger.info(`User '${decodedToken.sub}' has administration grants`);
         // Put the Admin role as first in the array
         decodedToken.resource_access[conf.auth.clientId].roles.sort((a, b) => (a === adminRole ? -1 : b === adminRole ? 1 : a.localeCompare(b)));
       } else if (decodedToken.resource_access[conf.auth.clientId].roles.indexOf(viewerRole) >= 0) {
         auth.isViewer = true;
-        wlogger.info(`User '${decodedToken.sub}' has viewer grants`);
         // Put the viewer role as first in the array
         decodedToken.resource_access[conf.auth.clientId].roles.sort((a, b) => (a === viewerRole ? -1 : b === viewerRole ? 1 : a.localeCompare(b)));
       } else {
@@ -98,9 +95,8 @@ exports.refreshUserToken = async (sub) => {
       userDataArray.splice(userDataIndex, 1);
       wlogger.error({ 'level': 'error', 'message': { 'Token not valid!': e } });
     }
-    //auth.decodedToken = decodedToken;
     userDataArray[userDataIndex].refresh_token = result.data.refresh_token;
-    wlogger.info("User token has been refreshed.");
+    // User token has been refreshed
     return {status: result.status, decodedToken: decodedToken};
 
   } catch (error) {
@@ -128,7 +124,7 @@ exports.token = async (req, res) => {
         wlogger.error("No response received from Keycloak " + keycloakTokenUrl.href); 
         wlogger.error("Timeout of "+ requestTimeout +"ms exceeded");
       }, requestTimeout);
-      //Capture
+      // Capture
       const result = await axios({
         method: 'post',
         url: keycloakTokenUrl.href,
@@ -145,6 +141,13 @@ exports.token = async (req, res) => {
         validateStatus: false,
         cancelToken: source.token
       });
+      if (result.data.error) {
+        wlogger.error(`Keycloak error: ${result.data.error} - ${result.data.error_description}`);
+        return res.status(401).json({
+          error: result.data.error,
+          error_description: result.data.error_description
+        });
+      }
       // Clear The Timeout
       clearTimeout(timeout);
       let auth = {};
@@ -153,16 +156,14 @@ exports.token = async (req, res) => {
       let decodedToken;
       let adminRole = (conf.adminRole) ? conf.adminRole : 'DATAFLOW_MANAGER';
       let viewerRole = (conf.viewerRole) ? conf.viewerRole : 'DATAFLOW_VIEWER';
-      try {        
+      try {      
         decodedToken = jwt.decode(result.data.access_token); //decodes and verifies the token extracted form the header
         if (decodedToken.resource_access[conf.auth.clientId].roles.indexOf(adminRole) >= 0) {
           auth.isAdmin = true;
-          wlogger.info(`User '${decodedToken.sub}' has administration grants`);
           // Put the Admin role as first in the array
           decodedToken.resource_access[conf.auth.clientId].roles.sort((a, b) => (a === adminRole ? -1 : b === adminRole ? 1 : a.localeCompare(b)));
         } else if (decodedToken.resource_access[conf.auth.clientId].roles.indexOf(viewerRole) >= 0) {
           auth.isViewer = true;
-          wlogger.info(`User '${decodedToken.sub}' has viewer grants`);
           // Put the viewer role as first in the array
           decodedToken.resource_access[conf.auth.clientId].roles.sort((a, b) => (a === viewerRole ? -1 : b === viewerRole ? 1 : a.localeCompare(b)));
         } else {
@@ -275,7 +276,7 @@ exports.logout = async (req, res) => {
  *  @param {string} req.body.refresh_token refresh_token
  */
 exports.isAuth = async (req, res) => {
-  return res.status(200).json('is auth response');
+  return res.status(200).json('user is auth');
 };
 
 /** [GET] /auth/check-admin-count
